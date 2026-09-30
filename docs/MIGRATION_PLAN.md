@@ -1,20 +1,21 @@
 # Amal Bank DNS migration to AWS: plan and task list (for approval)
 
-Status: **DRAFT, awaiting approval. No AWS or DNS changes have been made.**
+Status: **DRAFT, awaiting approval. AWS access verified. No AWS or DNS changes have been made.**
 Prepared: 2026-09-30. Scope follows the supplied migration prompt: DNS hosting, ebanking failover, website redirects and monitoring only. Banking endpoints, Microsoft 365, the destination site and domain registration are untouched.
 
-## 1. AWS availability check (result: NOT READY)
+## 1. AWS availability check (result: READY, read-only verified 2026-09-30)
 
 | Check | Result |
 |---|---|
-| AWS MCP server | Disconnected. It needs interactive re-authentication (`/mcp`, or the claude.ai connector settings), which a non-interactive cloud session cannot do. |
-| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` in the environment | Present, but STS `GetCallerIdentity` returns `InvalidClientTokenId`. The keys are invalid, expired or not for this account. |
-| AWS account identity | **Not verified.** The prompt requires this before any resource is created, so nothing will be created. |
-| Service availability | Route 53, CloudFront and ACM (certificate must be in us-east-1) are global or us-east-1 services, so availability is not expected to be a problem. Not confirmed through AWS APIs because of the above. |
-| Terraform / OpenTofu | Not installed in the sandbox (`boto3` and `dnspython` installed in a scratch venv only). The repository is empty (no commits), so there are no existing conventions or resources to reuse. |
-| Pricing | Not verified against AWS docs (AWS doc tools unavailable). Estimate in section 6 is provisional. |
+| Credentials | The standard `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` variables hold 14-character proxy placeholders and are rejected by AWS. The working key pair is in `AWS_Access_key` / `AWS_Secret_Access_key` (mixed case). Tooling must read those, or map them, for the AWS SDK/Terraform. |
+| Identity (STS) | Account `029288159395`, IAM user `claude-amal-bank-worker` (long-term access key). **Please confirm this is the intended account.** |
+| Permissions | Attached: `AdministratorAccess`, `DatabaseAdministrator`, `NetworkAdministrator`. Policy simulation allows every action needed (Route 53, CloudFront + Functions, ACM, SNS, CloudWatch, Logs, IAM roles, S3). This is far broader than needed. Recommend a scoped role before cutover. |
+| Existing resources | Route 53: one hosted zone, `amalbankapi.com` (6 records) and a registered domain `amalbankapi.com`. CloudFront: one distribution `E26WH3RBO9P510` (API Gateway origin in eu-west-1, no aliases). ACM (us-east-1): a certificate for `esahal-api.amalbankso.so`. CloudTrail: multi-region trail `management-events`. **These belong to other workloads and will not be touched.** |
+| Duplicates | No hosted zones for `amalbank.so` or `ebanking.amalbankso.com`, no health checks, no SNS topics, no CloudWatch alarms, no log groups and no CloudFront Functions exist. Nothing to reuse and nothing to conflict with. |
+| Terraform / OpenTofu | Not installed in the sandbox. The repo is empty, so there are no conventions to follow. Needs installation (provider download through the sandbox proxy still to be checked). |
+| Pricing | Not yet verified against AWS docs (the docs tool went away with the MCP server). Estimate in section 6 is provisional. |
 
-**Needed from you:** re-authorize the AWS MCP connector, or provide a working credential set for the correct account. Give the expected AWS account ID so I can compare it with the identity returned. Confirm the role's permissions cover Route 53, CloudFront, ACM, SNS, CloudWatch, CloudWatch Logs, IAM (scoped) and CloudTrail (read).
+Only read-only API calls were made. Nothing was created or changed.
 
 ## 2. Live DNS evidence (read-only, public recursive resolvers, 2026-09-30)
 
@@ -50,7 +51,7 @@ Delegation cache lifetimes to plan around: NS TTL 21600 (6 h) as seen at the chi
 Each phase has a gate. I stop at a failed gate and report.
 
 ### Phase 0: authoritative inventory (blocked on access)
-- [ ] 0.1 Verify AWS identity and record account ID and region. **Blocked on AWS access.**
+- [x] 0.1 Verify AWS identity and record account ID and region (done: account `029288159395`, awaiting your confirmation that it is correct).
 - [ ] 0.2 Trace delegation for all three names from the parent servers and query each authoritative server directly: delegation TTLs, SOA, negative TTL, DS, child delegations.
 - [ ] 0.3 Export the complete live `amalbank.so` zone and redirect settings from No-IP. Export the DigiCert zones including failover and monitor config. Reconcile the two and document every difference.
 - [ ] 0.4 Export the `amalbankso.com` parent zone from GoDaddy, noting every record at or below `ebanking`.
@@ -117,4 +118,4 @@ Completion is declared only if all required checks pass. Anything that cannot be
 | **Total** | **about USD 3-6 per month** |
 
 ## 7. Approval requested
-Reply with approval of this plan and the answers to section 3, plus restored AWS access. Until then, the only activity possible is read-only public DNS discovery.
+Reply with approval of this plan and the answers to section 3, including confirmation of AWS account `029288159395`. Until then, only read-only discovery is possible.
