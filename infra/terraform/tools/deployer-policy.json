@@ -1,0 +1,74 @@
+{
+  "_comment": "Draft least-privilege policy for the Terraform deployer role (replaces AdministratorAccess). Review and test with a plan/apply in a sandbox before adopting. Several Route 53/CloudFront/ACM create actions do not support resource-level scoping, so they use '*'.",
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "Route53Dns",
+      "Effect": "Allow",
+      "Action": [
+        "route53:CreateHostedZone", "route53:DeleteHostedZone", "route53:GetHostedZone", "route53:ListHostedZones",
+        "route53:ListHostedZonesByName", "route53:UpdateHostedZoneComment", "route53:ChangeResourceRecordSets",
+        "route53:ListResourceRecordSets", "route53:GetChange", "route53:ChangeTagsForResource",
+        "route53:ListTagsForResource", "route53:CreateHealthCheck", "route53:DeleteHealthCheck",
+        "route53:GetHealthCheck", "route53:UpdateHealthCheck", "route53:ListHealthChecks",
+        "route53:GetHealthCheckStatus", "route53:CreateQueryLoggingConfig", "route53:DeleteQueryLoggingConfig",
+        "route53:GetQueryLoggingConfig", "route53:ListQueryLoggingConfigs", "route53:TestDNSAnswer",
+        "route53:GetDNSSEC"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "CloudFrontRedirect",
+      "Effect": "Allow",
+      "Action": [
+        "cloudfront:CreateDistribution", "cloudfront:UpdateDistribution", "cloudfront:DeleteDistribution",
+        "cloudfront:GetDistribution", "cloudfront:GetDistributionConfig", "cloudfront:ListDistributions",
+        "cloudfront:CreateFunction", "cloudfront:UpdateFunction", "cloudfront:DeleteFunction",
+        "cloudfront:DescribeFunction", "cloudfront:GetFunction", "cloudfront:PublishFunction",
+        "cloudfront:TestFunction", "cloudfront:ListFunctions", "cloudfront:GetCachePolicy",
+        "cloudfront:ListCachePolicies", "cloudfront:TagResource", "cloudfront:ListTagsForResource"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "AcmCertificates",
+      "Effect": "Allow",
+      "Action": [
+        "acm:RequestCertificate", "acm:DescribeCertificate", "acm:DeleteCertificate", "acm:ListCertificates",
+        "acm:AddTagsToCertificate", "acm:ListTagsForCertificate"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "AlertingAndLogs",
+      "Effect": "Allow",
+      "Action": [
+        "sns:CreateTopic", "sns:DeleteTopic", "sns:GetTopicAttributes", "sns:SetTopicAttributes",
+        "sns:Subscribe", "sns:Unsubscribe", "sns:GetSubscriptionAttributes", "sns:ListSubscriptionsByTopic",
+        "sns:TagResource", "sns:ListTagsForResource",
+        "cloudwatch:PutMetricAlarm", "cloudwatch:PutCompositeAlarm", "cloudwatch:DeleteAlarms",
+        "cloudwatch:DescribeAlarms", "cloudwatch:ListTagsForResource", "cloudwatch:TagResource",
+        "cloudwatch:PutMetricData", "cloudwatch:SetAlarmState",
+        "logs:CreateLogGroup", "logs:DeleteLogGroup", "logs:DescribeLogGroups", "logs:PutRetentionPolicy",
+        "logs:TagResource", "logs:ListTagsForResource", "logs:PutResourcePolicy", "logs:DeleteResourcePolicy",
+        "logs:DescribeResourcePolicies"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "TerraformStateBucket",
+      "Effect": "Allow",
+      "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:ListBucket"],
+      "Resource": [
+        "arn:aws:s3:::amal-dns-tfstate-029288159395",
+        "arn:aws:s3:::amal-dns-tfstate-029288159395/*"
+      ]
+    },
+    {
+      "Sid": "IdentityCheck",
+      "Effect": "Allow",
+      "Action": ["sts:GetCallerIdentity"],
+      "Resource": "*"
+    }
+  ]
+}

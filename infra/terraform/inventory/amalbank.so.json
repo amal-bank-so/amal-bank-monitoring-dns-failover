@@ -1,0 +1,7 @@
+{
+  "_comment": "Verified authoritative amalbank.so inventory, populated in Phase 0 from the live No-IP export (NOT from the DigiCert view). 'name' is relative to the zone ('@' = apex, '*' = wildcard); never include the zone name or a trailing dot. 'values' use Route 53 syntax (TXT values include their double quotes; MX is 'priority host.'; CNAME/MX targets are FQDNs with a trailing dot). Do not list apex NS/SOA: AWS generates them.",
+  "verified": false,
+  "source": null,
+  "exported_at": null,
+  "records": []
+}

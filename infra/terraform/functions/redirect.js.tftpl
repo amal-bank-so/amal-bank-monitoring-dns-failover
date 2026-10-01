@@ -1,0 +1,48 @@
+// CloudFront Function (viewer-request, cloudfront-js-2.0).
+// Answers every request itself with a redirect, so the origin is never contacted.
+// Rendered by Terraform from variables; unit-tested in tools/redirect.test.mjs.
+var TARGET = '${target}';
+var STATUS = ${status_code};
+var PRESERVE_PATH = ${preserve_path};
+var PRESERVE_QUERY = ${preserve_query};
+var MAX_AGE = ${max_age};
+
+var DESCRIPTIONS = {
+  301: 'Moved Permanently',
+  302: 'Found',
+  307: 'Temporary Redirect',
+  308: 'Permanent Redirect'
+};
+
+function serialiseQuery(querystring) {
+  var parts = [];
+  Object.keys(querystring).forEach(function (key) {
+    var entry = querystring[key];
+    var values = entry.multiValue ? entry.multiValue.map(function (v) { return v.value; }) : [entry.value];
+    values.forEach(function (value) {
+      parts.push(value === '' ? key : key + '=' + value);
+    });
+  });
+  return parts.join('&');
+}
+
+function handler(event) {
+  var request = event.request;
+  var location = TARGET + (PRESERVE_PATH ? request.uri : '/');
+
+  if (PRESERVE_QUERY && request.querystring) {
+    var query = serialiseQuery(request.querystring);
+    if (query) {
+      location += '?' + query;
+    }
+  }
+
+  return {
+    statusCode: STATUS,
+    statusDescription: DESCRIPTIONS[STATUS],
+    headers: {
+      location: { value: location },
+      'cache-control': { value: 'max-age=' + MAX_AGE }
+    }
+  };
+}

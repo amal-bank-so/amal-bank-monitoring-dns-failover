@@ -1,0 +1,36 @@
+name: terraform-ci
+
+on:
+  push:
+    paths: ["infra/**", ".github/workflows/terraform-ci.yml"]
+  pull_request:
+    paths: ["infra/**", ".github/workflows/terraform-ci.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.16.4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Redirect Function unit tests
+        run: node --test infra/terraform/tools/redirect.test.mjs
+      - name: Format check
+        run: terraform fmt -check -recursive infra
+      - name: Validate main stack (no credentials, no backend)
+        working-directory: infra/terraform
+        run: |
+          terraform init -backend=false -input=false
+          terraform validate
+      - name: Validate bootstrap stack
+        working-directory: infra/bootstrap
+        run: |
+          terraform init -backend=false -input=false
+          terraform validate

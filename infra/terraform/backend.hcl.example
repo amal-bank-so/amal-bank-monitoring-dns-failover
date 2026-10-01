@@ -1,0 +1,7 @@
+# cp backend.hcl.example backend.hcl, then: terraform init -backend-config=backend.hcl
+# The bucket is created once by ../bootstrap. No secrets belong in this file.
+bucket       = "amal-dns-tfstate-029288159395"
+key          = "dns-migration/terraform.tfstate"
+region       = "us-east-1"
+use_lockfile = true
+encrypt      = true
