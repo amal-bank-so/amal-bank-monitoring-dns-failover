@@ -1,9 +1,9 @@
 # Amal Bank DNS migration: infrastructure code
 
 Terraform for the AWS side of the migration described in
-[`docs/MIGRATION_PLAN.md`](../docs/MIGRATION_PLAN.md). **Skeleton stage: nothing in
-this directory has been applied.** Plans were run read-only against account
-`029288159395`.
+[`docs/MIGRATION_PLAN.md`](../docs/MIGRATION_PLAN.md). **Status: only `infra/bootstrap` has been applied** (S3 state bucket
+`amal-dns-tfstate-029288159395`, 2026-10-01). The migration stack in `infra/terraform` has not
+been applied; its plans were run read-only against account `029288159395`.
 
 ```
 infra/
@@ -43,7 +43,7 @@ infra/
 
 ```bash
 . infra/terraform/tools/aws-env.sh          # maps AWS_Access_key / AWS_Secret_Access_key (prints no secrets)
-cd infra/bootstrap && terraform init && terraform apply     # once, after approval
+cd infra/bootstrap && terraform init && terraform apply     # DONE 2026-10-01; bootstrap state backed up at s3://amal-dns-tfstate-029288159395/bootstrap/terraform.tfstate
 cd ../terraform
 cp backend.hcl.example backend.hcl
 terraform init -backend-config=backend.hcl

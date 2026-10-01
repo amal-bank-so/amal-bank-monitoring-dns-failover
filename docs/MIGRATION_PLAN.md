@@ -62,7 +62,7 @@ Each phase has a gate. I stop at a failed gate and report.
 **Gate 0:** a verified inventory exists. If any source is unavailable, I continue staging only and report the specific blocker. No record values will be guessed.
 
 ### Phase 1: build on AWS (no delegation changes)
-- [x] 1.1 (skeleton) Terraform project in `infra/` (Terraform 1.16, AWS provider ~> 6.0, S3 state via `infra/bootstrap`). Validated, unit-tested and planned read-only; **not applied**. Choice recorded: Terraform.
+- [x] 1.1 (skeleton) Terraform project in `infra/` (Terraform 1.16, AWS provider ~> 6.0, S3 state via `infra/bootstrap`). Validated, unit-tested and planned read-only; migration stack **not applied**. State bucket `amal-dns-tfstate-029288159395` created 2026-10-01 (versioned, SSE-S3, public access blocked, TLS-only; main stack `init` against it verified). Choice recorded: Terraform.
 - [ ] 1.2 Create public hosted zones `amalbank.so` and `ebanking.amalbankso.com`. Record zone IDs and the four name servers each.
 - [ ] 1.3 Import verified records with BIND names normalized (no doubled zone names). Keep the AWS-generated NS/SOA. Preserve TTLs initially.
 - [ ] 1.4 ebanking failover: PRIMARY `37.34.133.35` and SECONDARY `91.140.155.171` with distinct set identifiers. One fixed-endpoint TCP 443 health check each, starting at 30 s interval and threshold 3 (provisional).
