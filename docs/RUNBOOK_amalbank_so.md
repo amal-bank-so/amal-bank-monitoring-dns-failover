@@ -62,3 +62,14 @@ Decisions and assumptions to know about:
 Watch the three alarms, review `/aws/route53/amalbank.so` for NXDOMAIN names (a name that should exist and does not
 means a record was missed), re-run `verify_zone.py post` daily, and keep No-IP active and unchanged. Do not retire
 No-IP before the observation period ends and you have approved it.
+
+## Status log
+
+- 2026-10-01 ~20:45Z: owner reported the registrar change as done. **Not yet live.** Route 53's own health checkers
+  (16 locations, independent resolvers) asked for a name that exists only in the AWS zone and all 16 got NXDOMAIN, i.e.
+  they still reach No-IP; no real resolver query has appeared in `/aws/route53/amalbank.so`; the ACM certificate is
+  still PENDING_VALIDATION. Final step (`enable_redirect_aliases`, then `web_use_cloudfront`) is waiting on this.
+- Probing caveat: public-resolver queries made from the build sandbox are all answered by one shared cache (identical,
+  counting-down TTLs across Google/Cloudflare/Quad9/OpenDNS/others), so they are not independent evidence of delegation.
+  Independent signals: ACM certificate status, the zone's query log, and a temporary probe record resolved by Route 53
+  health checkers.
