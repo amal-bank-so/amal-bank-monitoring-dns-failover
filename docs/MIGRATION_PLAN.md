@@ -53,7 +53,7 @@ Each phase has a gate. I stop at a failed gate and report.
 ### Phase 0: authoritative inventory (blocked on access)
 - [x] 0.1 Verify AWS identity and record account ID and region (done: account `029288159395`, awaiting your confirmation that it is correct).
 - [ ] 0.2 Trace delegation for all three names from the parent servers and query each authoritative server directly: delegation TTLs, SOA, negative TTL, DS, child delegations.
-- [ ] 0.3 Export the complete live `amalbank.so` zone and redirect settings from No-IP. Export the DigiCert zones including failover and monitor config. Reconcile the two and document every difference.
+- [ ] 0.3 *(converter ready: `infra/terraform/tools/bind_to_inventory.py`)* Export the complete live `amalbank.so` zone and redirect settings from No-IP. Export the DigiCert zones including failover and monitor config. Reconcile the two and document every difference.
 - [ ] 0.4 Export the `amalbankso.com` parent zone from GoDaddy, noting every record at or below `ebanking`.
 - [ ] 0.5 Discover hidden records: DKIM selectors, DMARC, SRV, CAA, verification TXT, certificate-validation CNAMEs, child delegations.
 - [ ] 0.6 Save timestamped backups and the exact original delegations. Agree a change freeze or synchronized change log.
@@ -75,7 +75,7 @@ Each phase has a gate. I stop at a failed gate and report.
 ### Phase 2: test before any delegation change
 - [ ] 2.1 Query all four AWS name servers for each zone. Compare every name/type/value with the authoritative export. Keep an explicit exception list. Confirm INSYNC.
 - [ ] 2.2 Test redirects (HTTP, HTTPS, TLS, deeper hostnames, loops, precedence) and banking TLS for the real hostname against the candidate endpoint.
-- [ ] 2.3 Failover tests using isolated test names and simulated health state only. Live banking endpoints are not disabled. Cover primary preferred, primary down, secondary down, both down, and recovery, plus alert delivery.
+- [ ] 2.3 *(driver ready: `infra/terraform/tools/failover_test.py`; needs `enable_failover_test` applied)* Failover tests using isolated test names and simulated health state only. Live banking endpoints are not disabled. Cover primary preferred, primary down, secondary down, both down, and recovery, plus alert delivery.
 - [ ] 2.4 Mail DNS parity check (MX, SPF, DKIM, DMARC, autodiscover as verified).
 - [ ] 2.5 Test the rollback procedure in staging.
 

@@ -20,8 +20,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
       - name: Redirect Function unit tests
         run: node --test infra/terraform/tools/redirect.test.mjs
+      - name: Python tool unit tests (BIND converter, failover driver)
+        run: |
+          pip install -r infra/terraform/tools/requirements.txt
+          python -W error::ResourceWarning -m unittest discover -s infra/terraform/tools
       - name: Format check
         run: terraform fmt -check -recursive infra
       - name: Validate main stack (no credentials, no backend)

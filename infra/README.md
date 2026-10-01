@@ -26,6 +26,37 @@ infra/
 | `logging.tf` | Route 53 query logging, CloudWatch log groups with explicit retention |
 | `failover_test.tf` | Optional isolated failover simulation on TEST-NET addresses (off by default) |
 
+## Tools (`infra/terraform/tools/`)
+
+Install once: `pip install -r infra/terraform/tools/requirements.txt`. Tests: `python -m unittest discover -s infra/terraform/tools`.
+
+### `bind_to_inventory.py`: BIND zone file to inventory JSON
+
+```bash
+python tools/bind_to_inventory.py --zone amalbank.so --input amalbank.so.zone \
+  --source "No-IP export <date>" --exported-at 2026-10-02T10:00:00Z \
+  --output inventory/amalbank.so.json --report /path/to/reconciliation-report.json
+```
+
+Relative names, `@` and wildcards are normalised; every value target becomes an absolute FQDN, so a zone
+suffix can never be appended twice. It **fails** (and writes no inventory) on: owner names ending with the
+zone name (missing trailing dot), out-of-zone records, a CNAME at the apex or beside other data, differing
+TTLs inside one record set, unsupported record types (provider-specific types such as redirects must be
+handled explicitly; `--allow-unsupported` still lists them), and unparseable input. Targets that look like a
+missing trailing dot are warnings (`--strict` makes them errors). Apex NS/SOA are not imported but are
+listed in the report so the original delegation can be saved. Output is always `"verified": false`; set it to
+`true` by hand only after reconciling the report against the authoritative export.
+
+### `failover_test.py`: isolated failover/failback/both-down test
+
+Needs the stack applied with `enable_failover_test=true`. `. tools/aws-env.sh && python tools/failover_test.py`
+(`--dry-run` lists the scenarios without AWS). It drives simulated health via CloudWatch metrics, asks Route 53
+what it would answer (`route53:TestDNSAnswer`; no delegation needed), measures how long each change takes, and
+writes JSON + Markdown evidence to `infra/terraform/evidence/`. It refuses to run unless the targets are the
+TEST-NET test pair with CLOUDWATCH_METRIC health checks and action-free alarms, and always restores healthy
+state. It never touches the live ebanking records, health checks or alarms. It does **not** test alert
+delivery (the test alarms deliberately notify nobody); that is a separate, owner-approved check.
+
 ## Safety rails built in
 
 - `allowed_account_ids` pins the stack to the expected account; `aws_region` must be `us-east-1`.

@@ -15,3 +15,5 @@ override.tf.json
 *.pem
 *.key
 scratch/
+__pycache__/
+*.pyc

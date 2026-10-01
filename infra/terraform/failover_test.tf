@@ -4,7 +4,10 @@
 # health states are set by publishing a custom metric (or forcing alarm state)
 # instead of ever disabling a live banking endpoint:
 #   aws cloudwatch put-metric-data --namespace AmalDnsTest --metric-name Unhealthy \
-#     --dimensions Target=primary --value 1
+#     --dimensions Target=primary --value 1 --storage-resolution 1
+# (tools/failover_test.py does this and checks every answer.) If the driver stops
+# publishing, the data is "missing" and treated as healthy, so the test pair returns
+# to normal on its own.
 # Answers are checked with route53:TestDNSAnswer / direct queries to the zone's
 # AWS name servers (the zone need not be delegated).
 
@@ -25,7 +28,7 @@ resource "aws_cloudwatch_metric_alarm" "failover_test" {
   metric_name         = "Unhealthy"
   dimensions          = { Target = each.key }
   statistic           = "Maximum"
-  period              = 60
+  period              = 10 # high-resolution alarm: the driver publishes StorageResolution=1 datapoints so state changes take effect in seconds, not minutes
   evaluation_periods  = 1
   comparison_operator = "GreaterThanOrEqualToThreshold"
   threshold           = 1
