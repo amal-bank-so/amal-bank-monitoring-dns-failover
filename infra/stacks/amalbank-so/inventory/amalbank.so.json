@@ -1,7 +1,7 @@
 {
   "_comment": "Verified authoritative amalbank.so inventory, populated in Phase 0 from the live No-IP export (NOT from the DigiCert view). 'name' is relative to the zone ('@' = apex, '*' = wildcard); never include the zone name or a trailing dot. 'values' use Route 53 syntax (TXT values include their double quotes; MX is 'priority host.'; CNAME/MX targets are FQDNs with a trailing dot). Do not list apex NS/SOA: AWS generates them.",
   "verified": true,
-  "source": "Public recursive resolvers (8.8.8.8, 1.1.1.1, 9.9.9.9) on 2026-10-02, NOT an authoritative export; completeness to be confirmed against the Microsoft 365 DNS record list",
+  "source": "Public recursive resolvers (8.8.8.8, 1.1.1.1, 9.9.9.9) on 2026-10-02, then CONFIRMED against the No-IP DNS records page pasted by the owner (5 records: URL @ and www, MX, SPF TXT, autodiscover TXT; URL records last updated 2022-12-29). No other records exist at No-IP.",
   "exported_at": "2026-10-02T00:00:00Z",
   "_conversion": {
     "tool": "bind_to_inventory.py 1.0",

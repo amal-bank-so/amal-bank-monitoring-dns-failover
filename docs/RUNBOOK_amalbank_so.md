@@ -98,9 +98,27 @@ No-IP before the observation period ends and you have approved it.
 | Zone built, records match the inventory, authoritative answers verified | Done (`infra/evidence/verify-zone-pre-*.md`) |
 | Delegation to Route 53 at the registrar | Done (propagating; in progress for ~10 of 16 vantage points) |
 | Redirect on CloudFront, certificate, TLS | Done and answering (301 over HTTP and HTTPS where resolved) |
-| Record completeness against the previous provider's export | **Pending, owner: you.** Inventory was built from public answers, not an export |
+| Record completeness against the previous provider's export | **Done.** The owner's No-IP records page (5 records) matches the AWS zone one for one; see the comparison below |
 | Inbound and outbound test mail | **Pending, owner: you** (needs an approved mailbox) |
 | Alert delivery | **Not performed**: no subscribers, by decision |
 | Redirect path/query behaviour matches the legacy service | **Unverified** (preserved by assumption) |
 | 7+ stable days of observation, longer than the longest delegation cache | **Pending** (earliest 2026-10-08) |
 | Retire No-IP | **Not before** the observation period ends and you approve |
+
+## Comparison with the No-IP records page (owner-provided, 2026-10-01)
+
+| No-IP record | TTL | AWS equivalent | Verdict |
+|---|---|---|---|
+| `@` URL `http://www.amalbankso.so` | 60 | `@` A + AAAA alias to CloudFront; Function answers `301` | Same function, different mechanism. **Difference:** target scheme (below) |
+| `www` URL `http://www.amalbankso.so` | 60 | `www` A + AAAA alias to CloudFront | Same as above |
+| `@` MX `amalbank-so.mail.protection.outlook.com` | 60 | identical, priority 5 (the No-IP page hides the priority; live answers have always been 5) | Match |
+| `@` TXT `v=spf1 include:spf.protection.outlook.com -all` | 300 | identical | Match |
+| `autodiscover` TXT `autodiscover.outlook.com` | 300 | identical | Match |
+
+AWS-only records (none conflict): apex NS and SOA (generated), `AAAA` aliases (new IPv6), and two `_...acm-validations.aws.`
+CNAMEs for the certificate.
+
+Known difference: No-IP redirects to the **`http://`** address of `www.amalbankso.so`; the AWS Function redirects to
+**`https://www.amalbankso.so`**. Chosen deliberately (a bank should not redirect visitors to an unencrypted address);
+the destination presumably upgrades to HTTPS anyway. To mirror No-IP exactly, set `redirect_target` to
+`http://www.amalbankso.so` (the variable currently only accepts https; it would need a one-line validation change).
