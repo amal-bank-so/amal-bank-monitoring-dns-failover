@@ -73,3 +73,28 @@ resolvers that cached it (NS TTL 900 s at the zone, plus the parent's TTL). Fix 
 At least 7 days and longer than the longest delegation cache lifetime. Watch the alarms in the CloudWatch console (they notify
 nobody), review `/aws/route53/ebanking.amalbankso.com`, and keep DigiCert active and unchanged. Do not cancel DigiCert before the
 observation period ends and you approve.
+
+## Status log
+
+- 2026-10-01 ~22:25Z: owner reported the `ebanking` NS records at GoDaddy replaced with the four AWS name servers.
+  **Delegation is live as seen from AWS**: a temporary probe record that exists only in the AWS zone was resolved by 13 of 16
+  Route 53 health-check locations (record and probe check removed afterwards); real queries for `ebanking.amalbankso.com A`
+  began reaching the zone at 22:03Z (query log). Route 53 answers `37.34.133.35` (primary healthy: 16/16 locations connect).
+  Secondary check still times out from all 16 (firewall), alarm `secondary-unhealthy` in ALARM as documented; `both-unhealthy`
+  OK. Resolvers that cached the DigiCert delegation move over as their caches expire (up to 21600 s plus the parent TTL); both
+  providers answer identically meanwhile. Observation period: at least 7 days (earliest 2026-10-08); keep DigiCert unchanged.
+
+## Completion status (against the migration brief)
+
+| Requirement | Status |
+|---|---|
+| Zone and failover records match the previous provider | Done (single apex A; PRIMARY/SECONDARY, TTL 1800) |
+| Delegation of `ebanking` in the `amalbankso.com` parent (GoDaddy) | Done, propagating |
+| Primary endpoint health check | Working from 16/16 locations |
+| Secondary endpoint health check | **Blocked by the secondary's firewall**; secondary record not gated by it (see section 2). Owner: bank network team |
+| Failover exercised against the live endpoints | **Not done, by design.** Isolated test pair exists but is off |
+| Failback and both-down behaviour demonstrated | **Not demonstrated** (documented Route 53 behaviour only) |
+| Banking TLS and application-level checks (login/read) | **Pending, owner: you** (needs an approved test account; no transactions) |
+| Alert delivery | **Not performed**: no subscribers, by decision |
+| 7+ stable days of observation | **Pending** (earliest 2026-10-08) |
+| Retire DigiCert | **Not before** the observation period ends and you approve |
