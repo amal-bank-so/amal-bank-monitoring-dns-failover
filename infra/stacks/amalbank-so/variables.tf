@@ -74,13 +74,19 @@ variable "enable_redirect" {
 }
 
 variable "enable_redirect_distribution" {
-  description = "Wait for the certificate to be ISSUED (needs the zone delegated), then create the CloudFront distribution. Requires enable_certificate and enable_redirect. It serves on its own cloudfront.net name and can be tested before any DNS record points at it."
+  description = "Create the CloudFront distribution with the redirect Function. Without enable_redirect_aliases it serves on its own cloudfront.net name only, so it can be deployed before the zone is delegated. Requires enable_redirect."
+  type        = bool
+  default     = false
+}
+
+variable "enable_redirect_aliases" {
+  description = "Attach amalbank.so / www.amalbank.so and the ACM certificate to the distribution. Waits for the certificate to be ISSUED, which requires the zone to be delegated to Route 53 (the validation CNAMEs live in this zone). Requires enable_redirect_distribution and enable_certificate."
   type        = bool
   default     = false
 }
 
 variable "web_use_cloudfront" {
-  description = "Switch the apex/www records from the legacy A records to CloudFront aliases (in place). Requires enable_redirect_distribution. Set false again to roll back to the legacy IP."
+  description = "Switch the apex/www records from the legacy A records to CloudFront aliases (in place). Requires enable_redirect_aliases. Set false again to roll back to the legacy IP."
   type        = bool
   default     = false
 }

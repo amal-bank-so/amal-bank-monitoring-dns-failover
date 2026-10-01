@@ -5,7 +5,7 @@ Terraform for the AWS side of the migration described in
 
 **Status (2026-10-01):** applied to account `029288159395`: `bootstrap` (state bucket), `shared` (alert topic, no
 subscribers yet) and `amalbank-so` (parity zone, monitoring and a pending certificate; **not delegated**, so
-nothing the public sees has changed). `ebanking` is not applied. The step-by-step for delegating and testing is
+nothing the public sees has changed), including the redirect Function and a CloudFront distribution on its own address. `ebanking` is not applied. The step-by-step for delegating and testing is
 [`docs/RUNBOOK_amalbank_so.md`](../docs/RUNBOOK_amalbank_so.md).
 
 ```
@@ -47,15 +47,16 @@ be added at the old providers. The old zone stays untouched as the rollback targ
    zone is delegated and abandons a request still pending after 72 hours.
 3. **Delegate at the registrar** to exactly the four name servers of this zone. Visitors see no change because the
    apex/www still point at the same IP.
-4. **`enable_redirect`**: the CloudFront Function (needs `redirect_status_code`, `redirect_preserve_path`,
+4. **`enable_redirect`** (applied): the CloudFront Function (needs `redirect_status_code`, `redirect_preserve_path`,
    `redirect_preserve_query`, which have no defaults).
-5. **`enable_redirect_distribution`** (needs the certificate ISSUED, i.e. the zone delegated): the distribution, which
-   serves on its own `cloudfront.net` name so it can be tested with `tools/check_web.sh --cloudfront` before any
-   record points at it.
-6. **`web_use_cloudfront`**: `web.tf` switches the apex/www records in place from the legacy `A` records to
-   CloudFront aliases (A + AAAA). The plan must show `~ update in-place`; **if it shows a replace, stop.**
+5. **`enable_redirect_distribution`** (applied): the distribution with the Function attached, on its own
+   `cloudfront.net` name only, so it is deployed before delegation.
+6. **`enable_redirect_aliases`** (after delegation; needs the certificate ISSUED): adds `amalbank.so` / `www.amalbank.so`
+   and the ACM certificate to the distribution.
+7. **`web_use_cloudfront`**: `web.tf` switches the apex/www records in place from the legacy `A` records to CloudFront
+   aliases (A + AAAA). The plan must show `~ update in-place`; **if it shows a replace, stop.**
 
-Rollback of step 6 is `web_use_cloudfront = false` (records revert to the legacy IP, TTL 60); rollback of step 3 is
+Rollback of step 7 is `web_use_cloudfront = false` (records revert to the legacy IP, TTL 60); rollback of step 3 is
 restoring the original registrar nameservers (bounded by delegation cache lifetimes). Production settings live in
 `stacks/amalbank-so/terraform.tfvars`.
 

@@ -78,6 +78,7 @@ run "switch_replaces_legacy_records_with_cloudfront_aliases" {
     enable_certificate           = true
     enable_redirect              = true
     enable_redirect_distribution = true
+    enable_redirect_aliases      = true
     web_use_cloudfront           = true
     redirect_status_code         = 301
     redirect_preserve_path       = true

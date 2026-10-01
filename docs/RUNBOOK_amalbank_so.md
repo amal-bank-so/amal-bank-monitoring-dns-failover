@@ -20,54 +20,35 @@ changes what the public sees.
 
 Verification evidence: `infra/evidence/verify-zone-pre-*.md` (15 PASS, 0 FAIL; certificate pending as expected).
 
-## 2. Not deployed yet, and why
+## 2. Redirect (deployed ahead of delegation)
 
-| Item | Waiting for |
+| Item | Value |
 |---|---|
-| CloudFront redirect (Function + distribution) | The certificate can only be issued once the zone is delegated. The Function needs `redirect_preserve_path` and `redirect_preserve_query` (see 3b). Status `301` is already measured. |
-| Apex/www switch to CloudFront | The distribution deployed and tested first. |
+| CloudFront distribution | `E1BIG6NEUGDEZH`, `d3s3cju1awyco5.cloudfront.net`, status Deployed, serving on its own address only (no `amalbank.so` names attached yet) |
+| Function | `amal-dns-amalbank-so-redirect` (live stage, viewer-request): `301` to `https://www.amalbankso.so`, **path and query preserved** |
+| Alarm | `amal-dns-amalbank-so-redirect-5xx` |
 
-Behaviour changes to expect from the redirect (decide they are acceptable): the legacy redirect **refuses HTTPS**, so
-`https://amalbank.so` fails today and will work with CloudFront; `AAAA` (IPv6) records will appear.
+Decisions and assumptions to know about:
+- Status `301` was measured on the legacy redirect. **Path/query preservation is an assumption** (standard for a domain
+  redirect); the legacy service's behaviour could not be observed. To change it, edit `redirect_preserve_path` /
+  `redirect_preserve_query` in `infra/stacks/amalbank-so/terraform.tfvars` and apply.
+- The legacy redirect **refuses HTTPS** (port 443), so `https://amalbank.so` fails today and will work after the switch.
+  `AAAA` (IPv6) records will appear.
+- Alarms and the alert topic exist but have no subscribers, by decision.
 
-## 3. Before you delegate (owner checklist)
+## 3. Delegate, then finish
 
-a. **Completeness.** The zone was built from what public resolvers return for the names probed, not from an export.
-   Anything else that exists at No-IP will be lost on delegation. Check the Microsoft 365 admin center (Domains,
-   `amalbank.so`, DNS records) and anything else that uses `amalbank.so` (DKIM `selector1/selector2._domainkey`,
-   DMARC `_dmarc`, verification TXT, SRV). Send me anything missing; it is added to the inventory before delegation.
-
-b. **Capture the legacy web behaviour** from your network (the sandbox cannot reach the domain) and send it:
-   `infra/tools/check_web.sh > before.txt`. Key lines: the `Location` for `http://amalbank.so/some/path?x=1&y=a%20b&z`
-   (is the path/query kept or dropped?).
-
-c. **Record the original delegation** shown at the registrar (screenshot): expected `ns1.no-ip.com` to
-   `ns4.no-ip.com`. Confirm no DNSSEC DS record is set (none is visible publicly) and the domain is not registrar-locked
-   against nameserver changes.
-
-d. **Alerts.** Give me the recipient addresses; each must click the SNS confirmation email. Until then the alarms
-   are silent.
-
-e. **Window and rollback contact.** Pick a time when someone can watch for 1 hour.
-
-## 4. Delegate
-
-1. At the registrar replace the nameservers with exactly the four in section 1 (and nothing else). Do not touch
-   DNSSEC. Do **not** change, delete or cancel anything at No-IP; it is the rollback.
-2. Web visitors and mail see no change: the AWS zone answers identically.
-3. From the repo (needs AWS access):
-   `python infra/tools/verify_zone.py post --wait 3600`
-   It reports PENDING for resolvers still holding the old delegation (No-IP NS TTL is 21600 s, plus the registry's
-   parent TTL) and PASS once each public resolver shows the AWS name servers and the right answers.
-4. When `verify_zone` shows the certificate **ISSUED** (usually minutes after resolvers see the new delegation):
-   set `enable_redirect = true`, `redirect_preserve_path`, `redirect_preserve_query`, and
-   `enable_redirect_distribution = true` in `infra/stacks/amalbank-so/terraform.tfvars`, plan, review, apply
-   (the distribution takes ~10 minutes to deploy).
-5. Test CloudFront **before** switching records: `infra/tools/check_web.sh --cloudfront <distribution domain>`;
-   compare with `before.txt`.
-6. Switch: `web_use_cloudfront = true`, plan (it must show `~ update in-place` for the apex/www `A` records, not
-   replace), apply, then `python infra/tools/verify_zone.py post --web cloudfront` and `infra/tools/check_web.sh`.
-7. Mail: send a test message in both directions with an approved mailbox; `MX`/`SPF` are checked by `verify_zone`.
+1. **You:** at the registrar replace the nameservers with exactly the four in section 1 (nothing else; do not touch
+   DNSSEC). Do not change or cancel anything at No-IP: it is the rollback. Original delegation to restore if needed:
+   `ns1.no-ip.com`, `ns2.no-ip.com`, `ns3.no-ip.com`, `ns4.no-ip.com`.
+2. Visitors and mail see no change: the AWS zone answers identically and apex/www still point at the same IP.
+3. **Then tell me it is done.** I apply the final step in `infra/stacks/amalbank-so/terraform.tfvars`:
+   `enable_redirect_aliases = true` (waits for the certificate to be ISSUED, usually minutes after resolvers see the new
+   delegation) and, after the distribution update completes, `web_use_cloudfront = true` (the plan must show
+   `~ update in-place` for the apex/www `A` records, not a replace). From that point `amalbank.so` and `www` are served by
+   CloudFront. The certificate request is abandoned by ACM at 2026-10-04T19:17Z if still pending; if delegation slips past
+   that: `terraform apply -replace='aws_acm_certificate.redirect[0]'`.
+4. You test.
 
 ## 5. Rollback
 
