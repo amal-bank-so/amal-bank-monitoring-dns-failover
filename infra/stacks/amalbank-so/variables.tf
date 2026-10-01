@@ -62,7 +62,32 @@ variable "enable_redirect" {
 }
 
 variable "enable_redirect_distribution" {
-  description = "Stage B: wait for the certificate to be ISSUED, then create the CloudFront distribution and Route 53 aliases. Requires enable_redirect. Only set once the certificate validation records are resolvable (zone delegated, or the records added at the live DNS provider)."
+  description = "Stage B: wait for the certificate to be ISSUED, then create the CloudFront distribution and Route 53 aliases. Requires enable_redirect. Only set once the certificate is issued, which requires the zone to be delegated to Route 53 (the validation CNAMEs live in this zone)."
+  type        = bool
+  default     = false
+}
+
+# --- web records: legacy (parity) -> CloudFront ------------------------------
+
+variable "legacy_web_ips" {
+  description = "The apex/www A record value(s) currently served by the old provider's redirect service, taken from the verified export (observed publicly: 34.198.182.201). Served at the apex and www until the CloudFront distribution is enabled, so delegating the zone changes nothing for web visitors. They are excluded from the record inventory (bind_to_inventory.py --exclude) and managed in web.tf."
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition     = alltrue([for ip in var.legacy_web_ips : can(cidrhost("${ip}/32", 0))])
+    error_message = "legacy_web_ips must be IPv4 addresses."
+  }
+}
+
+variable "legacy_web_ttl" {
+  description = "TTL of the legacy apex/www A records (observed: 60)."
+  type        = number
+  default     = 60
+}
+
+variable "no_web_records" {
+  description = "Explicitly acknowledge that the apex and www should have NO address record before the redirect distribution exists. Without this (or legacy_web_ips) a verified inventory refuses to plan, because delegating would take the website down."
   type        = bool
   default     = false
 }

@@ -18,9 +18,9 @@ locals {
     }
   }
 
-  # Names the CloudFront aliases own when the redirect distribution is enabled.
-  # The inventory must list these as intentional exceptions (--exclude), not records.
-  redirect_owned = var.enable_redirect_distribution ? flatten([for l in local.redirect_labels : ["${l}|A", "${l}|AAAA"]]) : []
+  # Apex/www (and wildcard, if chosen) address records are owned by web.tf. The
+  # inventory must list them as intentional exceptions (--exclude), not records.
+  redirect_owned = flatten([for l in distinct(concat(local.web_labels_legacy, local.redirect_labels)) : ["${l}|A", "${l}|AAAA"]])
 }
 
 # Fails the plan on a malformed or conflicting inventory.
@@ -57,7 +57,7 @@ resource "terraform_data" "inventory_guard" {
     }
     precondition {
       condition     = length(setintersection(keys(local.records), local.redirect_owned)) == 0
-      error_message = "The inventory defines A/AAAA records for names the CloudFront redirect aliases will own (apex and www, or apex and wildcard). Exclude them from the inventory as documented exceptions (bind_to_inventory.py --exclude) before enabling the redirect distribution."
+      error_message = "The inventory defines A/AAAA records for the apex, www or wildcard, which web.tf owns (legacy A records now, CloudFront aliases later). Exclude them from the inventory as recorded exceptions (bind_to_inventory.py --exclude) and put the legacy address in legacy_web_ips."
     }
   }
 }

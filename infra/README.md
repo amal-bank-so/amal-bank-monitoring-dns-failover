@@ -29,20 +29,30 @@ log resource policies keep them independent. `tools/test_stack_layout.py` enforc
 | Stack | Default plan | Notes |
 |---|---|---|
 | `shared` | topic, topic policy, one subscription per `alert_emails` entry | Subscriptions need email confirmation. |
-| `amalbank-so` | hosted zone, query log group + policy + config (5 resources) | Records, redirect and alarm are opt-in (below). |
+| `amalbank-so` | hosted zone, query log group + policy + config (5 resources) | Records, legacy web records, redirect and alarm are driven by the inventory/variables (below). |
 | `ebanking` | zone, 2 health checks, 2 failover records, alarms, query log | Not used until after `amalbank.so`. `enable_failover_test` adds the simulation pair. |
 
-## amalbank.so stack in stages
+## amalbank.so stack: direct delegation at the registrar
 
-1. **Zone** (default): the new zone only. Nothing resolves through it until the registrar delegation changes.
-2. **Records:** convert the verified export with `tools/bind_to_inventory.py` into
-   `stacks/amalbank-so/inventory/amalbank.so.json`, review, set `"verified": true`. Records from the old redirect
-   service (apex/www A) are dropped with `--exclude @:A --exclude www:A` and recorded as exceptions.
+The registrar is pointed straight at the Route 53 zone, bypassing No-IP and DNS Made Easy, so nothing needs to
+be added at the old providers. The old zone stays untouched as the rollback target. Sequence:
+
+1. **Parity zone** (no delegation yet): hosted zone, query logging, the record inventory, and the apex/www `A`
+   records pointing at the legacy redirect IP (`legacy_web_ips`, TTL 60). Convert the verified export with
+   `tools/bind_to_inventory.py --exclude @:A --exclude www:A` (those two are managed in `web.tf`, not the
+   inventory), review, set `"verified": true`. A verified inventory with no web address refuses to plan.
+2. **Delegate at the registrar** to exactly the four name servers of this zone. Web visitors see no change
+   because the apex/www still point at the same IP.
 3. **Redirect stage A** (`enable_redirect=true` plus `redirect_status_code`, `redirect_preserve_path`,
-   `redirect_preserve_query`, which have no defaults): ACM certificate, validation CNAMEs, CloudFront Function.
-   Add the `acm_validation_records` output at the live DNS provider (No-IP) so the certificate can issue.
-4. **Redirect stage B** (`enable_redirect_distribution=true`): waits for ISSUED, creates the distribution, Route 53
-   aliases and a 5xx alarm to the shared topic.
+   `redirect_preserve_query`, which have no defaults): ACM certificate, its validation CNAMEs (created in this
+   zone; ACM validates once the zone is delegated) and the CloudFront Function.
+4. **Redirect stage B** (`enable_redirect_distribution=true`, after the certificate is ISSUED): distribution,
+   then `web.tf` switches the apex/www records in place from the legacy `A` records to CloudFront aliases
+   (A + AAAA) and a 5xx alarm to the shared topic is added. The switch is one change to the same record; the
+   plan must show `~ update in-place`. **If it shows a replace, stop.**
+
+Rollback of step 4 is setting `enable_redirect_distribution=false` (records revert to the legacy IP, TTL 60);
+rollback of step 2 is restoring the original registrar nameservers (bounded by delegation cache lifetimes).
 
 By default the redirect covers the apex and `www`, mirroring live behaviour (no wildcard exists today).
 `redirect_wildcard=true` switches to apex + `*.amalbank.so`, which changes behaviour (unknown names stop

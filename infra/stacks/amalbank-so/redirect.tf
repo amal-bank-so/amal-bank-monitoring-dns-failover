@@ -1,12 +1,15 @@
 # amalbank.so redirect: CloudFront + viewer-request Function (replaces the
-# No-IP redirect). Route 53 records cannot redirect URLs.
+# old provider's redirect). Route 53 records cannot redirect URLs.
 #
-# Two stages, because ACM DNS validation needs the validation CNAMEs to be
-# publicly resolvable and the zone is not delegated to Route 53 until cutover:
-#   Stage A (enable_redirect): certificate, validation records, Function.
-#     -> add the output `acm_validation_records` at the live DNS provider (No-IP).
-#   Stage B (enable_redirect_distribution): wait for ISSUED, then distribution
-#     and Route 53 aliases.
+# Direct-delegation sequence (the registrar points straight at this zone; the old
+# provider is bypassed, so no validation record is ever needed there):
+#   0. Zone + inventory + legacy web A records (web.tf): a like-for-like parity zone.
+#   1. Delegate at the registrar.
+#   2. Stage A (enable_redirect): certificate and its validation CNAMEs (in this
+#      zone), plus the Function. ACM validates once the zone is publicly delegated.
+#   3. Stage B (enable_redirect_distribution): distribution, then web.tf switches
+#      the apex/www records from the legacy A records to CloudFront aliases.
+# Stage A may also be applied before delegation; ACM keeps retrying validation.
 #
 # Names: by default the apex and www, mirroring live behaviour (no wildcard exists
 # today). redirect_wildcard = true switches to the apex and *.amalbank.so instead.
@@ -169,22 +172,5 @@ resource "aws_cloudfront_distribution" "redirect" {
     acm_certificate_arn      = aws_acm_certificate_validation.redirect[0].certificate_arn
     ssl_support_method       = "sni-only"
     minimum_protocol_version = "TLSv1.2_2021"
-  }
-}
-
-resource "aws_route53_record" "redirect_alias" {
-  for_each = local.redirect_dist ? {
-    for pair in setproduct(local.redirect_labels, ["A", "AAAA"]) :
-    "${pair[0]}-${pair[1]}" => { label = pair[0], type = pair[1] }
-  } : {}
-
-  zone_id = aws_route53_zone.amalbank_so.zone_id
-  name    = each.value.label == "@" ? local.amalbank_zone : "${each.value.label}.${local.amalbank_zone}"
-  type    = each.value.type
-
-  alias {
-    name                   = aws_cloudfront_distribution.redirect[0].domain_name
-    zone_id                = local.cloudfront_zone_id
-    evaluate_target_health = false
   }
 }

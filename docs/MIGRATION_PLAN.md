@@ -51,6 +51,23 @@ These were observed from public resolvers only. Direct queries to authoritative 
 
 Delegation cache lifetimes to plan around: NS TTL 21600 (6 h) as seen at the child, parent-side delegation TTLs still to be measured (TLDs typically use 24-48 h), and the ebanking A record at 1800 s.
 
+## 2b. Decision: delegate `amalbank.so` directly at the registrar (2026-10-02)
+
+The owner has registrar access and chose to bypass No-IP (and DigiCert) for `amalbank.so`: build a parity zone in
+Route 53, then point the registrar straight at it. Consequences:
+
+- No ACM validation record is ever needed at No-IP; the certificate validates through the Route 53 zone once it is
+  delegated. The redirect becomes a separate, quickly reversible step after delegation (apex/www A records switch
+  in place from the legacy redirect IP to CloudFront aliases).
+- The old No-IP zone is **not** changed or cancelled. It remains the rollback target and must stay active for the
+  observation period.
+- Skipping the No-IP export removes the check that the AWS zone is complete. Compensating controls: the
+  Microsoft 365 admin center DNS list for mail completeness, the owner's confirmation of any other dependants
+  of `amalbank.so`, and Route 53 query logging to catch NXDOMAIN for names that were expected to exist. Public
+  probing cannot enumerate a zone, so anything not in those sources is at risk of being lost on cutover.
+- Scope note: this covers `amalbank.so` only. `ebanking.amalbankso.com` is a child of `amalbankso.com` (hosted at
+  GoDaddy); delegating that whole parent domain is a different, larger change (see section 3).
+
 ## 3. Decisions needed from you
 
 1. **Source of truth for `amalbank.so`:** provide No-IP access (or a full zone and redirect export) to confirm it is authoritative. Recommended.

@@ -7,7 +7,7 @@ output "amalbank_so_zone" {
 }
 
 output "acm_validation_records" {
-  description = "Stage A output: create these CNAMEs at the live DNS provider (No-IP) before cutover so ACM can issue the certificate."
+  description = "Stage A output: the certificate validation CNAMEs. They are created in this zone automatically; nothing is added at the old provider. ACM issues once the zone is delegated to Route 53."
   value       = local.acm_validation
 }
 
@@ -19,6 +19,11 @@ output "redirect" {
     distribution_id = local.redirect_dist ? aws_cloudfront_distribution.redirect[0].id : null
     distribution_dn = local.redirect_dist ? aws_cloudfront_distribution.redirect[0].domain_name : null
   } : null
+}
+
+output "web_records" {
+  description = "How the apex/www records are currently served: legacy A records or CloudFront aliases."
+  value       = { for k, v in local.web_records : k => v.alias ? "alias -> CloudFront" : "A -> ${join(", ", var.legacy_web_ips)} (TTL ${var.legacy_web_ttl})" }
 }
 
 output "query_log_group" {
