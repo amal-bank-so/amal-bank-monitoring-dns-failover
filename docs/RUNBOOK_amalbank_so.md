@@ -99,7 +99,8 @@ No-IP before the observation period ends and you have approved it.
 | Delegation to Route 53 at the registrar | Done (propagating; in progress for ~10 of 16 vantage points) |
 | Redirect on CloudFront, certificate, TLS | Done and answering (301 over HTTP and HTTPS where resolved) |
 | Record completeness against the previous provider's export | **Done.** The owner's No-IP records page (5 records) matches the AWS zone one for one; see the comparison below |
-| Inbound and outbound test mail | **Pending, owner: you** (needs an approved mailbox) |
+| Inbound test mail | **Done.** Owner sent "Claude Proof email after migration of amalbank.so" from a Gmail account at 15:55 local (21:55Z) and it arrived with the tenant's external-sender banner. The zone's query log shows Google's resolver (172.253.196.152) and a Microsoft-range resolver asking Route 53 for the `amalbank.so` MX at 21:55:06Z and 21:55:08Z, so the AWS zone served the lookup |
+| Outbound test mail | **Pending, owner: you** (send from an `@amalbank.so` mailbox to an external address and confirm it arrives and passes SPF) |
 | Alert delivery | **Not performed**: no subscribers, by decision |
 | Redirect path/query behaviour matches the legacy service | **Unverified** (preserved by assumption) |
 | 7+ stable days of observation, longer than the longest delegation cache | **Pending** (earliest 2026-10-08) |
