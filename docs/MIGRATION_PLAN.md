@@ -69,7 +69,7 @@ Each phase has a gate. I stop at a failed gate and report.
 ### Phase 0: authoritative inventory (blocked on access)
 - [x] 0.1 Verify AWS identity and record account ID and region (done: account `029288159395`, awaiting your confirmation that it is correct).
 - [ ] 0.2 Trace delegation for all three names from the parent servers and query each authoritative server directly: delegation TTLs, SOA, negative TTL, DS, child delegations.
-- [ ] 0.3 *(converter ready: `infra/terraform/tools/bind_to_inventory.py`)* Export the complete live `amalbank.so` zone and redirect settings from No-IP. Export the DigiCert zones including failover and monitor config. Reconcile the two and document every difference.
+- [ ] 0.3 *(converter ready: `infra/tools/bind_to_inventory.py`)* Export the complete live `amalbank.so` zone and redirect settings from No-IP. Export the DigiCert zones including failover and monitor config. Reconcile the two and document every difference.
 - [ ] 0.4 Export the `amalbankso.com` parent zone from GoDaddy, noting every record at or below `ebanking`.
 - [ ] 0.5 Discover hidden records: DKIM selectors, DMARC, SRV, CAA, verification TXT, certificate-validation CNAMEs, child delegations.
 - [ ] 0.6 Save timestamped backups and the exact original delegations. Agree a change freeze or synchronized change log.
@@ -78,7 +78,7 @@ Each phase has a gate. I stop at a failed gate and report.
 **Gate 0:** a verified inventory exists. If any source is unavailable, I continue staging only and report the specific blocker. No record values will be guessed.
 
 ### Phase 1: build on AWS (no delegation changes)
-- [x] 1.1 (skeleton) Terraform project in `infra/` (Terraform 1.16, AWS provider ~> 6.0, S3 state via `infra/bootstrap`). Validated, unit-tested and planned read-only; migration stack **not applied**. State bucket `amal-dns-tfstate-029288159395` created 2026-10-01 (versioned, SSE-S3, public access blocked, TLS-only; main stack `init` against it verified). Choice recorded: Terraform.
+- [x] 1.1 (skeleton) Terraform in `infra/`, **split into three independent stacks with separate state**: `shared` (alert topic), `amalbank-so`, `ebanking`; apply order shared, then amalbank-so, then ebanking (see `infra/README.md`). Terraform 1.16, AWS provider ~> 6.0, S3 state via `infra/bootstrap`. Validated, unit-tested and planned read-only; stacks **not applied**. State bucket `amal-dns-tfstate-029288159395` created 2026-10-01 (versioned, SSE-S3, public access blocked, TLS-only). Choice recorded: Terraform.
 - [ ] 1.2 Create public hosted zones `amalbank.so` and `ebanking.amalbankso.com`. Record zone IDs and the four name servers each.
 - [ ] 1.3 Import verified records with BIND names normalized (no doubled zone names). Keep the AWS-generated NS/SOA. Preserve TTLs initially.
 - [ ] 1.4 ebanking failover: PRIMARY `37.34.133.35` and SECONDARY `91.140.155.171` with distinct set identifiers. One fixed-endpoint TCP 443 health check each, starting at 30 s interval and threshold 3 (provisional).
@@ -91,7 +91,7 @@ Each phase has a gate. I stop at a failed gate and report.
 ### Phase 2: test before any delegation change
 - [ ] 2.1 Query all four AWS name servers for each zone. Compare every name/type/value with the authoritative export. Keep an explicit exception list. Confirm INSYNC.
 - [ ] 2.2 Test redirects (HTTP, HTTPS, TLS, deeper hostnames, loops, precedence) and banking TLS for the real hostname against the candidate endpoint.
-- [ ] 2.3 *(driver ready: `infra/terraform/tools/failover_test.py`; needs `enable_failover_test` applied)* Failover tests using isolated test names and simulated health state only. Live banking endpoints are not disabled. Cover primary preferred, primary down, secondary down, both down, and recovery, plus alert delivery.
+- [ ] 2.3 *(driver ready: `infra/tools/failover_test.py`; needs the ebanking stack applied with `enable_failover_test`)* Failover tests using isolated test names and simulated health state only. Live banking endpoints are not disabled. Cover primary preferred, primary down, secondary down, both down, and recovery, plus alert delivery.
 - [ ] 2.4 Mail DNS parity check (MX, SPF, DKIM, DMARC, autodiscover as verified).
 - [ ] 2.5 Test the rollback procedure in staging.
 

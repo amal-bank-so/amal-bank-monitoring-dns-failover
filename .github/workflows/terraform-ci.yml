@@ -24,20 +24,16 @@ jobs:
         with:
           python-version: "3.12"
       - name: Redirect Function unit tests
-        run: node --test infra/terraform/tools/redirect.test.mjs
+        run: node --test infra/tools/redirect.test.mjs
       - name: Python tool unit tests (BIND converter, failover driver)
         run: |
-          pip install -r infra/terraform/tools/requirements.txt
-          python -W error::ResourceWarning -m unittest discover -s infra/terraform/tools
+          pip install -r infra/tools/requirements.txt
+          python -W error::ResourceWarning -m unittest discover -s infra/tools
       - name: Format check
         run: terraform fmt -check -recursive infra
-      - name: Validate main stack (no credentials, no backend)
-        working-directory: infra/terraform
+      - name: Validate every stack (no credentials, no backend)
         run: |
-          terraform init -backend=false -input=false
-          terraform validate
-      - name: Validate bootstrap stack
-        working-directory: infra/bootstrap
-        run: |
-          terraform init -backend=false -input=false
-          terraform validate
+          for d in infra/stacks/shared infra/stacks/amalbank-so infra/stacks/ebanking infra/bootstrap; do
+            echo "== $d"
+            (cd "$d" && terraform init -backend=false -input=false && terraform validate)
+          done

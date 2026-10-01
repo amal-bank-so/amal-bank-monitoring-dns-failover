@@ -8,7 +8,7 @@ backend.hcl
 override.tf
 override.tf.json
 *_override.tf
-# keep the lock file: infra/terraform/.terraform.lock.hcl and infra/bootstrap/.terraform.lock.hcl
+# keep the lock file: each stack's and infra/bootstrap's .terraform.lock.hcl
 
 # Local secrets / scratch
 .env

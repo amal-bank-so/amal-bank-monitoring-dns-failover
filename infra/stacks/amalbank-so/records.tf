@@ -18,8 +18,9 @@ locals {
     }
   }
 
-  # Names the redirect stack owns when it is enabled.
-  redirect_owned = var.enable_redirect_distribution ? ["@|A", "@|AAAA", "*|A", "*|AAAA"] : []
+  # Names the CloudFront aliases own when the redirect distribution is enabled.
+  # The inventory must list these as intentional exceptions (--exclude), not records.
+  redirect_owned = var.enable_redirect_distribution ? flatten([for l in local.redirect_labels : ["${l}|A", "${l}|AAAA"]]) : []
 }
 
 # Fails the plan on a malformed or conflicting inventory.
@@ -56,7 +57,7 @@ resource "terraform_data" "inventory_guard" {
     }
     precondition {
       condition     = length(setintersection(keys(local.records), local.redirect_owned)) == 0
-      error_message = "The inventory defines apex or wildcard A/AAAA records that the CloudFront redirect aliases will own. Resolve this conflict explicitly before enabling the redirect distribution."
+      error_message = "The inventory defines A/AAAA records for names the CloudFront redirect aliases will own (apex and www, or apex and wildcard). Exclude them from the inventory as documented exceptions (bind_to_inventory.py --exclude) before enabling the redirect distribution."
     }
   }
 }

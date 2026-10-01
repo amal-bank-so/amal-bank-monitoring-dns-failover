@@ -1,0 +1,48 @@
+# Health alarms -> shared SNS topic -> owner-approved email recipients.
+# The topic and subscriptions live in the shared stack (apply that first).
+
+data "aws_sns_topic" "alerts" {
+  count = var.enable_alarms && var.enable_ebanking_failover ? 1 : 0
+  name  = "${var.name_prefix}-alerts"
+}
+
+locals {
+  health_checks = var.enable_ebanking_failover ? {
+    primary   = aws_route53_health_check.ebanking_primary[0].id
+    secondary = aws_route53_health_check.ebanking_secondary[0].id
+  } : {}
+  alarms_enabled = var.enable_alarms && var.enable_ebanking_failover
+}
+
+# HealthCheckStatus is 1 (healthy) or 0 (unhealthy). Missing data means the
+# checkers are not reporting, which is treated as a failure.
+resource "aws_cloudwatch_metric_alarm" "ebanking_health" {
+  for_each = local.alarms_enabled ? local.health_checks : {}
+
+  alarm_name          = "${var.name_prefix}-ebanking-${each.key}-unhealthy"
+  alarm_description   = "Route 53 health check for the ebanking ${each.key} endpoint is unhealthy (TCP ${var.health_check_port})."
+  namespace           = "AWS/Route53"
+  metric_name         = "HealthCheckStatus"
+  dimensions          = { HealthCheckId = each.value }
+  statistic           = "Minimum"
+  period              = 60
+  evaluation_periods  = 1
+  comparison_operator = "LessThanThreshold"
+  threshold           = 1
+  treat_missing_data  = "breaching"
+
+  alarm_actions = [data.aws_sns_topic.alerts[0].arn]
+  ok_actions    = [data.aws_sns_topic.alerts[0].arn]
+}
+
+# Both endpoints unhealthy at the same time: critical (Route 53 then answers with the primary).
+resource "aws_cloudwatch_composite_alarm" "ebanking_both_down" {
+  count = local.alarms_enabled ? 1 : 0
+
+  alarm_name        = "${var.name_prefix}-ebanking-both-unhealthy"
+  alarm_description = "Both ebanking endpoints are failing Route 53 health checks. Route 53 will answer with the primary."
+  alarm_rule        = "ALARM(${aws_cloudwatch_metric_alarm.ebanking_health["primary"].alarm_name}) AND ALARM(${aws_cloudwatch_metric_alarm.ebanking_health["secondary"].alarm_name})"
+
+  alarm_actions = [data.aws_sns_topic.alerts[0].arn]
+  ok_actions    = [data.aws_sns_topic.alerts[0].arn]
+}

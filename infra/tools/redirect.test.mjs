@@ -1,5 +1,5 @@
 // Unit tests for the CloudFront redirect Function template.
-// Run: node --test infra/terraform/tools/redirect.test.mjs
+// Run: node --test infra/tools/redirect.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const template = readFileSync(join(here, '..', 'functions', 'redirect.js.tftpl'), 'utf8');
+const template = readFileSync(join(here, '..', 'stacks', 'amalbank-so', 'functions', 'redirect.js.tftpl'), 'utf8');
 
 // Same substitution Terraform's templatefile() performs for this template.
 function load(vars) {

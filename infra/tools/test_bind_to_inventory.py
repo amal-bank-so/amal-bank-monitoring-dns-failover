@@ -1,4 +1,4 @@
-"""Unit tests for bind_to_inventory.py. Run: python -m unittest discover -s infra/terraform/tools"""
+"""Unit tests for bind_to_inventory.py. Run: python -m unittest discover -s infra/tools"""
 import json
 import os
 import re
@@ -178,9 +178,47 @@ class SafetyChecks(unittest.TestCase):
         self.assertTrue(res.errors)
 
 
+class Exclusions(unittest.TestCase):
+    TEXT = "$ORIGIN amalbank.so.\n$TTL 60\n@ IN A 34.198.182.201\nwww IN A 34.198.182.201\n@ IN MX 5 mx.example.com.\n"
+
+    def test_excluded_records_removed_and_recorded(self):
+        res = conv(self.TEXT, exclude=["@:A", "www:a"])
+        self.assertEqual([(r["name"], r["type"]) for r in res.records], [("@", "MX")])
+        self.assertEqual(sorted((r["name"], r["type"]) for r in res.excluded), [("@", "A"), ("www", "A")])
+        self.assertEqual(len(res.excluded), 2)
+        self.assertEqual(res.excluded[0]["values"], ["34.198.182.201"])
+        self.assertEqual(res.warnings, [])
+
+    def test_unmatched_exclusion_is_a_warning(self):
+        res = conv(self.TEXT, exclude=["ghost:A"])
+        self.assertEqual(len(res.records), 3)
+        self.assertTrue(any("matched no record" in w for w in res.warnings))
+
+    def test_malformed_exclusion_is_an_error(self):
+        for bad in ("www", "www:HINFO", ":A"):
+            self.assertTrue(conv(self.TEXT, exclude=[bad]).errors, bad)
+
+    def test_exceptions_appear_in_inventory_and_report(self):
+        res = conv(self.TEXT, exclude=["@:A"])
+        inv = b.build_inventory(res, "src", None, "abc")
+        self.assertEqual(inv["_conversion"]["excluded_exceptions"][0]["name"], "@")
+        self.assertEqual(b.build_report(res, "abc")["excluded_exceptions"][0]["type"], "A")
+
+    def test_cli_exclude_flag(self):
+        with tempfile.TemporaryDirectory() as d:
+            src, out = os.path.join(d, "z"), os.path.join(d, "o.json")
+            with open(src, "w") as fh:
+                fh.write(self.TEXT)
+            p = subprocess.run([sys.executable, os.path.join(HERE, "bind_to_inventory.py"), "--zone", ZONE, "--input", src,
+                                "--output", out, "--exclude", "@:A", "--exclude", "www:A"], capture_output=True, text=True)
+            self.assertEqual(p.returncode, 0, p.stderr)
+            with open(out) as fh:
+                self.assertEqual([r["type"] for r in json.load(fh)["records"]], ["MX"])
+
+
 class Contract(unittest.TestCase):
     def test_allowed_types_match_terraform(self):
-        with open(os.path.join(HERE, "..", "records.tf")) as fh:
+        with open(os.path.join(HERE, "..", "stacks", "amalbank-so", "records.tf")) as fh:
             tf = fh.read()
         m = re.search(r"allowed_record_types\s*=\s*\[(.*?)\]", tf, re.S)
         tf_types = re.findall(r'"([A-Z]+)"', m.group(1))

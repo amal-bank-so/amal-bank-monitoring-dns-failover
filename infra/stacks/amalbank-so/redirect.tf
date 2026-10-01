@@ -1,20 +1,26 @@
 # amalbank.so redirect: CloudFront + viewer-request Function (replaces the
 # No-IP redirect). Route 53 records cannot redirect URLs.
 #
-# Two stages, because ACM DNS validation needs the validation CNAME to be
+# Two stages, because ACM DNS validation needs the validation CNAMEs to be
 # publicly resolvable and the zone is not delegated to Route 53 until cutover:
 #   Stage A (enable_redirect): certificate, validation records, Function.
 #     -> add the output `acm_validation_records` at the live DNS provider (No-IP).
 #   Stage B (enable_redirect_distribution): wait for ISSUED, then distribution
-#     and Route 53 aliases for the apex and wildcard.
+#     and Route 53 aliases.
 #
-# Note: the wildcard covers ONE label (a.amalbank.so) and the certificate only
-# covers apex + *.amalbank.so, so deeper names (a.b.amalbank.so) will fail TLS.
-# Test and decide in Phase 2 whether any such names exist.
+# Names: by default the apex and www, mirroring live behaviour (no wildcard exists
+# today). redirect_wildcard = true switches to the apex and *.amalbank.so instead.
+# A wildcard covers ONE label (a.amalbank.so); deeper names would fail TLS.
 
 locals {
   redirect_enabled = var.enable_redirect
   redirect_dist    = var.enable_redirect && var.enable_redirect_distribution
+
+  redirect_names  = var.redirect_wildcard ? [local.amalbank_zone, "*.${local.amalbank_zone}"] : [local.amalbank_zone, "www.${local.amalbank_zone}"]
+  redirect_labels = var.redirect_wildcard ? ["@", "*"] : ["@", "www"]
+
+  # A wildcard shares the apex's validation CNAME, so it needs no record of its own.
+  acm_validated_names = [for n in local.redirect_names : n if !startswith(n, "*.")]
 }
 
 resource "terraform_data" "redirect_guard" {
@@ -36,7 +42,7 @@ resource "aws_acm_certificate" "redirect" {
   count = local.redirect_enabled ? 1 : 0
 
   domain_name               = local.amalbank_zone
-  subject_alternative_names = ["*.${local.amalbank_zone}"]
+  subject_alternative_names = [for n in local.redirect_names : n if n != local.amalbank_zone]
   validation_method         = "DNS"
 
   lifecycle {
@@ -46,35 +52,35 @@ resource "aws_acm_certificate" "redirect" {
   depends_on = [terraform_data.redirect_guard]
 }
 
-# Apex and wildcard share one validation CNAME, so a single record covers both.
-# Its name/value are only known after the certificate exists, so the for_each key
-# is static; a precondition confirms at apply time that both names really do share
-# the same record.
+# One validation CNAME per non-wildcard name. Names/values are only known after the
+# certificate exists, so for_each keys come from the static name list.
 locals {
   acm_dvo = local.redirect_enabled ? aws_acm_certificate.redirect[0].domain_validation_options : []
   acm_validation = local.redirect_enabled ? {
-    validation = {
-      name  = one([for d in local.acm_dvo : d.resource_record_name if d.domain_name == local.amalbank_zone])
-      type  = one([for d in local.acm_dvo : d.resource_record_type if d.domain_name == local.amalbank_zone])
-      value = one([for d in local.acm_dvo : d.resource_record_value if d.domain_name == local.amalbank_zone])
+    for n in local.acm_validated_names : n => {
+      name  = one([for d in local.acm_dvo : d.resource_record_name if d.domain_name == n])
+      type  = one([for d in local.acm_dvo : d.resource_record_type if d.domain_name == n])
+      value = one([for d in local.acm_dvo : d.resource_record_value if d.domain_name == n])
     }
   } : {}
 }
 
 resource "aws_route53_record" "acm_validation" {
-  for_each = local.redirect_enabled ? toset(["validation"]) : toset([])
+  for_each = local.acm_validation
 
   zone_id         = aws_route53_zone.amalbank_so.zone_id
-  name            = local.acm_validation[each.key].name
-  type            = local.acm_validation[each.key].type
+  name            = each.value.name
+  type            = each.value.type
   ttl             = 300
-  records         = [local.acm_validation[each.key].value]
+  records         = [each.value.value]
   allow_overwrite = false
 
   lifecycle {
     precondition {
-      condition     = length(distinct([for d in local.acm_dvo : d.resource_record_name])) == 1
-      error_message = "ACM returned different validation records for the apex and wildcard names; this stack assumes they share one CNAME. Add a record per name."
+      condition = !var.redirect_wildcard || length(distinct([
+        for d in local.acm_dvo : d.resource_record_name if contains([local.amalbank_zone, "*.${local.amalbank_zone}"], d.domain_name)
+      ])) == 1
+      error_message = "ACM returned different validation records for the apex and wildcard names; this stack assumes they share one CNAME. Add a record for the wildcard."
     }
   }
 }
@@ -95,7 +101,7 @@ resource "aws_cloudfront_function" "redirect" {
 
   name    = "${var.name_prefix}-amalbank-so-redirect"
   runtime = "cloudfront-js-2.0"
-  comment = "Redirect amalbank.so and *.amalbank.so to ${var.redirect_target}"
+  comment = "Redirect ${join(", ", local.redirect_names)} to ${var.redirect_target}"
   publish = true
 
   code = templatefile("${path.module}/functions/redirect.js.tftpl", {
@@ -121,7 +127,7 @@ resource "aws_cloudfront_distribution" "redirect" {
   is_ipv6_enabled = true
   http_version    = "http2and3"
   price_class     = var.redirect_price_class
-  aliases         = local.redirect_alias
+  aliases         = local.redirect_names
   comment         = "amalbank.so redirect to ${var.redirect_target}"
 
   # Minimal valid origin. Requests are answered by the viewer-request Function and
@@ -168,14 +174,12 @@ resource "aws_cloudfront_distribution" "redirect" {
 
 resource "aws_route53_record" "redirect_alias" {
   for_each = local.redirect_dist ? {
-    "apex-A"        = { name = local.amalbank_zone, type = "A" }
-    "apex-AAAA"     = { name = local.amalbank_zone, type = "AAAA" }
-    "wildcard-A"    = { name = "*.${local.amalbank_zone}", type = "A" }
-    "wildcard-AAAA" = { name = "*.${local.amalbank_zone}", type = "AAAA" }
+    for pair in setproduct(local.redirect_labels, ["A", "AAAA"]) :
+    "${pair[0]}-${pair[1]}" => { label = pair[0], type = pair[1] }
   } : {}
 
   zone_id = aws_route53_zone.amalbank_so.zone_id
-  name    = each.value.name
+  name    = each.value.label == "@" ? local.amalbank_zone : "${each.value.label}.${local.amalbank_zone}"
   type    = each.value.type
 
   alias {

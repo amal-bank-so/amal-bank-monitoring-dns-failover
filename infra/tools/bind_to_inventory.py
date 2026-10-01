@@ -12,7 +12,11 @@ Normalises names the way Route 53 needs them and refuses to guess:
 * apex NS/SOA are not imported (Route 53 generates them) but are listed in the report
   so the original delegation can be compared and saved;
 * unsupported or provider-specific types are listed as exceptions and fail the run
-  unless --allow-unsupported is given, so nothing is dropped silently.
+  unless --allow-unsupported is given, so nothing is dropped silently;
+* intentional replacements (for example the apex/www A records that point at the old
+  provider's redirect service and are replaced by CloudFront aliases) are removed only
+  with an explicit --exclude NAME:TYPE, and are recorded as exceptions in the inventory
+  and the report; an exclusion that matches nothing is flagged.
 
 The output always has "verified": false. A human flips it to true after reconciling the
 report against the authoritative export (see docs/MIGRATION_PLAN.md, Phase 0).
@@ -20,7 +24,8 @@ report against the authoritative export (see docs/MIGRATION_PLAN.md, Phase 0).
 Usage:
   bind_to_inventory.py --zone amalbank.so --input amalbank.so.zone \\
       --source "No-IP export 2026-10-02" --exported-at 2026-10-02T10:00:00Z \\
-      --output ../inventory/amalbank.so.json --report report.json
+      --exclude @:A --exclude www:A \\
+      --output ../stacks/amalbank-so/inventory/amalbank.so.json --report report.json
 
 Exit codes: 0 ok, 2 conversion errors (or warnings with --strict), 1 usage/IO error.
 """
@@ -70,6 +75,7 @@ class Result:
     skipped_apex: list = field(default_factory=list)  # apex NS/SOA, for the report only
     unsupported: list = field(default_factory=list)
     child_delegations: list = field(default_factory=list)
+    excluded: list = field(default_factory=list)  # intentional exceptions (--exclude)
     warnings: list = field(default_factory=list)
     errors: list = field(default_factory=list)
 
@@ -145,7 +151,7 @@ def _is_suspicious_target(target: dns.name.Name, origin: dns.name.Name) -> bool:
     return last in COMMON_TLDS
 
 
-def convert(text: str, zone: str, default_ttl: int | None = None) -> Result:
+def convert(text: str, zone: str, default_ttl: int | None = None, exclude=()) -> Result:
     zone = zone.rstrip(".").lower()
     origin = dns.name.from_text(zone + ".")
     res = Result(zone=zone)
@@ -243,6 +249,25 @@ def convert(text: str, zone: str, default_ttl: int | None = None) -> Result:
                     f"(occluded; review before import)"
                 )
 
+    # Explicit, recorded exceptions (e.g. records replaced by CloudFront aliases).
+    wanted = {}
+    for spec in exclude:
+        name, _, rtype = spec.rpartition(":")
+        if not name or rtype.upper() not in ALLOWED_TYPES:
+            res.errors.append(f"--exclude {spec!r}: expected NAME:TYPE with a supported type (e.g. www:A)")
+            continue
+        wanted[(name.lower(), rtype.upper())] = spec
+    kept = []
+    for r in res.records:
+        if (r["name"], r["type"]) in wanted:
+            res.excluded.append(r)
+            wanted.pop((r["name"], r["type"]))
+        else:
+            kept.append(r)
+    res.records = kept
+    for spec in wanted.values():
+        res.warnings.append(f"--exclude {spec}: matched no record in the export")
+
     order = {t: i for i, t in enumerate(ALLOWED_TYPES)}
     res.records.sort(key=lambda r: (r["name"] != "@", r["name"], order[r["type"]]))
     return res
@@ -263,6 +288,7 @@ def build_inventory(res: Result, source, exported_at, input_sha256: str) -> dict
             "skipped_apex_ns_soa": len(res.skipped_apex),
             "unsupported": len(res.unsupported),
             "warnings": len(res.warnings),
+            "excluded_exceptions": res.excluded,
         },
         "records": res.records,
     }
@@ -278,6 +304,7 @@ def build_report(res: Result, input_sha256: str) -> dict:
         "skipped_apex_ns_soa": res.skipped_apex,
         "child_delegations": res.child_delegations,
         "unsupported": res.unsupported,
+        "excluded_exceptions": res.excluded,
         "warnings": res.warnings,
         "errors": res.errors,
     }
@@ -294,6 +321,8 @@ def main(argv=None) -> int:
     ap.add_argument("--default-ttl", type=int, help="TTL for records with none and no $TTL in the file")
     ap.add_argument("--allow-unsupported", action="store_true",
                     help="succeed even if unsupported record types exist (they stay listed as exceptions)")
+    ap.add_argument("--exclude", action="append", default=[], metavar="NAME:TYPE",
+                    help="drop this record set as an intentional, recorded exception (repeatable), e.g. www:A")
     ap.add_argument("--strict", action="store_true", help="treat warnings as errors")
     args = ap.parse_args(argv)
 
@@ -305,7 +334,7 @@ def main(argv=None) -> int:
         return 1
     sha = hashlib.sha256(raw).hexdigest()
 
-    res = convert(text, args.zone, args.default_ttl)
+    res = convert(text, args.zone, args.default_ttl, args.exclude)
     report = build_report(res, sha)
 
     for e in res.errors:
@@ -318,7 +347,7 @@ def main(argv=None) -> int:
     ok = res.ok(strict=args.strict, allow_unsupported=args.allow_unsupported)
     print(
         f"{res.zone}: {len(res.records)} record sets, {len(res.skipped_apex)} apex NS/SOA skipped, "
-        f"{len(res.unsupported)} unsupported, {len(res.warnings)} warnings, {len(res.errors)} errors",
+        f"{len(res.unsupported)} unsupported, {len(res.excluded)} excluded, {len(res.warnings)} warnings, {len(res.errors)} errors",
         file=sys.stderr,
     )
 

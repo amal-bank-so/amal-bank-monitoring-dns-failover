@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Exercise Route 53 failover on the isolated test record pair, never on live endpoints.
 
-Requires the Terraform stack applied with enable_failover_test=true. That creates
+Requires the ebanking Terraform stack applied with enable_failover_test=true. That creates
 failover-test.ebanking.amalbankso.com with PRIMARY/SECONDARY records on TEST-NET-1
 addresses whose health checks follow CloudWatch alarms. This driver sets each target's
 simulated health by publishing a high-resolution custom metric, asks Route 53 what it

@@ -1,5 +1,5 @@
 """Unit tests for failover_test.py using a simulated Route 53 and a virtual clock.
-Run: python -m unittest discover -s infra/terraform/tools"""
+Run: python -m unittest discover -s infra/tools"""
 import copy
 import json
 import os
