@@ -21,6 +21,7 @@ redirect_preserve_query = true
 
 enable_redirect_distribution = true
 
-# After the registrar delegation (needs the certificate ISSUED), these two are applied:
-#   enable_redirect_aliases = true   attach amalbank.so / www.amalbank.so + the certificate
-#   web_use_cloudfront      = true   point apex/www at CloudFront (rollback: set false)
+# Delegation to Route 53 is live (2026-10-01). Attach the names and certificate (this waits for ACM to
+# issue the certificate), then point apex/www at CloudFront with web_use_cloudfront (rollback: false).
+enable_redirect_aliases = true
+web_use_cloudfront        = true

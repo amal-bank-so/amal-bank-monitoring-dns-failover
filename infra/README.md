@@ -4,8 +4,8 @@ Terraform for the AWS side of the migration described in
 [`docs/MIGRATION_PLAN.md`](../docs/MIGRATION_PLAN.md).
 
 **Status (2026-10-01):** applied to account `029288159395`: `bootstrap` (state bucket), `shared` (alert topic, no
-subscribers yet) and `amalbank-so` (parity zone, monitoring and a pending certificate; **not delegated**, so
-nothing the public sees has changed), including the redirect Function and a CloudFront distribution on its own address. `ebanking` is not applied. The step-by-step for delegating and testing is
+subscribers) and `amalbank-so`, which is **fully live**: `amalbank.so` is delegated to Route 53, the certificate is issued,
+and the apex and `www` are served by CloudFront (301 to the destination site). `ebanking` is not applied. The step-by-step for delegating and testing is
 [`docs/RUNBOOK_amalbank_so.md`](../docs/RUNBOOK_amalbank_so.md).
 
 ```

@@ -73,3 +73,14 @@ No-IP before the observation period ends and you have approved it.
   counting-down TTLs across Google/Cloudflare/Quad9/OpenDNS/others), so they are not independent evidence of delegation.
   Independent signals: ACM certificate status, the zone's query log, and a temporary probe record resolved by Route 53
   health checkers.
+- 2026-10-01 21:13Z: delegation observed going live (real resolver queries in the zone's query log; 5 of 16 Route 53
+  checkers resolved an AWS-only probe name; probe record and health check removed afterwards).
+- 2026-10-01 21:23Z: certificate **ISSUED** (amalbank.so, www.amalbank.so, valid to 2027-04-16) about 3 minutes after the
+  validation wait began; distribution `E1BIG6NEUGDEZH` updated in place with both names and the certificate (TLS 1.2+,
+  SNI), status Deployed. The live Function was exercised through CloudFront's test API: 301 with the correct target,
+  path and query preserved.
+- 2026-10-01 ~21:30Z: **switch applied** (`web_use_cloudfront = true`): apex and www `A` records changed in place from the
+  legacy `34.198.182.201` to CloudFront aliases, plus new `AAAA` aliases. Route 53 now answers with CloudFront addresses;
+  MX, SPF and `autodiscover` unchanged. Resolvers still holding the old delegation or the old 60 s records move over as
+  their caches expire. Rollback: `web_use_cloudfront = false` (back to the legacy IP, TTL 60) or restore the registrar
+  nameservers. Observation period: at least 7 days; No-IP stays active and unchanged.
