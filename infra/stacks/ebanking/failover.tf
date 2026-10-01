@@ -3,7 +3,8 @@
 # hostname itself.
 #
 # Behaviour to be aware of (see docs/MIGRATION_PLAN.md, section 5):
-#  * With health checks on both records Route 53 returns the PRIMARY when both
+#  * By default only the PRIMARY record is gated by a health check (see
+#    secondary_failover_requires_health_check). With health checks on both records Route 53 returns the PRIMARY when both
 #    are unhealthy, and returns to it as soon as it recovers.
 #  * TCP 443 proves reachability only, not application readiness.
 
@@ -64,7 +65,7 @@ resource "aws_route53_record" "ebanking_secondary" {
   ttl             = var.ebanking_ttl
   records         = [var.ebanking_secondary_ip]
   set_identifier  = "ebanking-secondary"
-  health_check_id = aws_route53_health_check.ebanking_secondary[0].id
+  health_check_id = var.secondary_failover_requires_health_check ? aws_route53_health_check.ebanking_secondary[0].id : null
 
   failover_routing_policy {
     type = "SECONDARY"

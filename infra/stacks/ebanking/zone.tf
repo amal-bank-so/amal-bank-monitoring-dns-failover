@@ -10,3 +10,16 @@ resource "aws_route53_zone" "ebanking" {
     Name = local.ebanking_zone
   }
 }
+
+# Route 53 generates the apex NS and SOA records and defaults the NS TTL to 172800
+# (2 days). Keep the generated name servers but lower the TTL so that resolvers which
+# cached this delegation return to the previous one within minutes if a rollback is
+# needed. The parent (amalbankso.com) NS records for this name are a separate TTL.
+resource "aws_route53_record" "apex_ns" {
+  zone_id         = aws_route53_zone.ebanking.zone_id
+  name            = local.ebanking_zone
+  type            = "NS"
+  ttl             = var.apex_ns_ttl
+  records         = aws_route53_zone.ebanking.name_servers
+  allow_overwrite = true
+}

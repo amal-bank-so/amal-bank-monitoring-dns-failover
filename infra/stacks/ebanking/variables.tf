@@ -50,6 +50,17 @@ variable "query_log_retention_days" {
   }
 }
 
+variable "apex_ns_ttl" {
+  description = "TTL of the zone's apex NS records. Route 53 defaults to 172800 (2 days), which would keep resolvers on this delegation for days after a rollback; lowered so a rollback takes effect in minutes."
+  type        = number
+  default     = 900
+
+  validation {
+    condition     = var.apex_ns_ttl >= 60 && var.apex_ns_ttl <= 172800
+    error_message = "apex_ns_ttl must be between 60 and 172800."
+  }
+}
+
 # --- ebanking failover -------------------------------------------------------
 
 variable "enable_ebanking_failover" {
@@ -78,6 +89,12 @@ variable "ebanking_secondary_ip" {
     condition     = can(cidrhost("${var.ebanking_secondary_ip}/32", 0))
     error_message = "ebanking_secondary_ip must be an IPv4 address."
   }
+}
+
+variable "secondary_failover_requires_health_check" {
+  description = "true: the secondary record is only served while its own Route 53 health check is healthy (the design in the migration brief). false: the secondary record has no health check attached, so a primary failure always fails over to it, which is how the previous DNS provider behaves. Route 53's health checkers could not reach the secondary on TCP 443 (timeout from all 16 locations while the endpoint itself accepts connections from elsewhere), so with true a primary failure would never fail over. The secondary check is still created for monitoring. Set true after the secondary's firewall allows the Route 53 health-checker ranges."
+  type        = bool
+  default     = false
 }
 
 variable "ebanking_ttl" {

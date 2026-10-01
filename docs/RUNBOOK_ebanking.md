@@ -1,0 +1,75 @@
+# Runbook: ebanking.amalbankso.com migration to Route 53
+
+State as of 2026-10-01. Everything below is **applied in AWS account `029288159395`, us-east-1**, and **nothing is
+delegated yet**: `ebanking.amalbankso.com` is still served by DigiCert DNS Made Easy. Delegating (section 3) is the only
+step that changes what customers' resolvers use.
+
+## 1. What is deployed (stack `infra/stacks/ebanking`)
+
+| Item | Value |
+|---|---|
+| Hosted zone | `ebanking.amalbankso.com`, ID `Z01112481OCSOFIT54YT1` |
+| **Name servers (give the parent zone exactly these four)** | `ns-1273.awsdns-31.org`, `ns-1926.awsdns-48.co.uk`, `ns-379.awsdns-47.com`, `ns-827.awsdns-39.net` |
+| Records (parity with DigiCert) | `@ A 37.34.133.35` PRIMARY (set `ebanking-primary`, health check), `@ A 91.140.155.171` SECONDARY (set `ebanking-secondary`), both TTL 1800 |
+| Apex NS TTL | 900 s (Route 53 default is 172800) |
+| Health checks | primary `f40f28f3-46f7-4565-86b1-a9fa30f4c302` (TCP 443 on `37.34.133.35`), secondary `0ce5aea4-0529-40f4-bc6e-9a123b89fb61` (TCP 443 on `91.140.155.171`); every 30 s, three failures to mark unhealthy (about 90 s; provisional, DigiCert's "Medium" does not map directly) |
+| Alarms | `amal-dns-ebanking-primary-unhealthy`, `amal-dns-ebanking-secondary-unhealthy`, `amal-dns-ebanking-both-unhealthy`; topic `amal-dns-alerts` has no subscribers by decision, so they notify nobody |
+| Query logging | `/aws/route53/ebanking.amalbankso.com`, retention 365 days |
+
+The live zone contains only the apex `A` (confirmed from the recording's zone definition and public probes: no other names,
+no wildcard, no DNSSEC at the zone or the parent). Failover behaviour equals DigiCert's as understood: primary preferred,
+secondary when the primary is unhealthy, automatic return when it recovers (the recording shows "turn off auto-failover after
+first failure" unchecked).
+
+## 2. Finding that changed the design: the secondary endpoint cannot be health-checked by Route 53
+
+Measured after deployment from Route 53's 16 health-check locations:
+- primary `37.34.133.35:443`: **16 of 16 connect**.
+- secondary `91.140.155.171:443`: **16 of 16 time out**, although a control connection from another network reaches it. Its
+  firewall allows other sources but not Route 53's health checkers.
+
+If the secondary record required a healthy secondary check, a primary failure would leave both endpoints "unhealthy" and
+Route 53 would keep answering with the primary: **failover would never happen**. So the secondary record has **no health
+check attached** (`secondary_failover_requires_health_check = false`): when the primary is unhealthy Route 53 always answers
+with the secondary, as DigiCert does today. The secondary check still exists for monitoring and its alarm stays in ALARM
+until the secondary's firewall allows Route 53. To adopt the design in the migration brief (both gated), have the network
+team allow the ranges of service `ROUTE53_HEALTHCHECKS` in <https://ip-ranges.amazonaws.com/ip-ranges.json> (31 prefixes at
+the time of writing; the list changes) to TCP 443 on `91.140.155.171`, wait for the secondary alarm to return to OK, then set
+`secondary_failover_requires_health_check = true` in `infra/stacks/ebanking/terraform.tfvars` and apply. No banking firewall was
+changed by this migration.
+
+TCP 443 only proves the port accepts connections, not that the application is healthy.
+
+## 3. Delegate (owner step)
+
+The delegation of `ebanking` lives in the **`amalbankso.com` zone at GoDaddy** (`ns53/ns54.domaincontrol.com`). Do **not**
+change the registrar nameservers of `amalbankso.com`, and do not touch any other record there.
+1. In the GoDaddy DNS for `amalbankso.com`, find the `NS` records for host **`ebanking`** (currently six DigiCert servers).
+   Replace them with exactly the four name servers in section 1. Set their TTL to the lowest GoDaddy allows.
+2. **Keep the DigiCert zone active and unchanged** (including its failover settings) for the whole observation period.
+   Original delegation to restore on rollback: `ns20.digicertdns.com`, `ns21.digicertdns.com`, `ns22.digicertdns.com`,
+   `ns23.digicertdns.net`, `ns24.digicertdns.net`, `ns25.digicertdns.net`.
+3. Both providers answer identically, so nothing changes for customers while resolvers move over. Resolvers that cached the
+   DigiCert delegation keep using it for up to its TTL (21600 s) plus the parent record's TTL.
+4. Tell me when it is done. I check from Route 53's side (query log and health checkers) that the delegation is live.
+
+## 4. Operating notes and differences from DigiCert
+
+- **TTL 1800 is preserved for parity.** Clients can keep a stale answer for up to 30 minutes after a failover. To fail over
+  faster, lower `ebanking_ttl` in `terraform.tfvars` (the brief proposes 300 during preparation and 60 as the validated final)
+  and apply; the higher query volume costs cents.
+- **Both endpoints failing:** Route 53 answers with the primary, so the name never becomes empty.
+- **Failback is automatic** once the primary's check is healthy again.
+- Failover has **not** been exercised against live endpoints (by design: a live banking endpoint is never disabled to
+  demonstrate failure). The isolated test pair exists in the stack (`enable_failover_test`) and is off.
+
+## 5. Rollback
+
+At GoDaddy restore the six DigiCert `NS` records for `ebanking` (section 3). The AWS zone stays in place and keeps answering
+resolvers that cached it (NS TTL 900 s at the zone, plus the parent's TTL). Fix the AWS zone as well if it was the cause.
+
+## 6. Observation
+
+At least 7 days and longer than the longest delegation cache lifetime. Watch the alarms in the CloudWatch console (they notify
+nobody), review `/aws/route53/ebanking.amalbankso.com`, and keep DigiCert active and unchanged. Do not cancel DigiCert before the
+observation period ends and you approve.

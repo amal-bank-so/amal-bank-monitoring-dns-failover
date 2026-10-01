@@ -5,7 +5,8 @@ Terraform for the AWS side of the migration described in
 
 **Status (2026-10-01):** applied to account `029288159395`: `bootstrap` (state bucket), `shared` (alert topic, no
 subscribers) and `amalbank-so`, which is **fully live**: `amalbank.so` is delegated to Route 53, the certificate is issued,
-and the apex and `www` are served by CloudFront (301 to the destination site). `ebanking` is not applied. The step-by-step for delegating and testing is
+and the apex and `www` are served by CloudFront (301 to the destination site). `ebanking` is **applied but not yet
+delegated** (see [`docs/RUNBOOK_ebanking.md`](../docs/RUNBOOK_ebanking.md)). The step-by-step for delegating and testing is
 [`docs/RUNBOOK_amalbank_so.md`](../docs/RUNBOOK_amalbank_so.md).
 
 ```
@@ -31,7 +32,7 @@ log resource policies keep them independent. `tools/test_stack_layout.py` enforc
 |---|---|---|
 | `shared` | topic, topic policy, one subscription per `alert_emails` entry | Subscriptions need email confirmation. |
 | `amalbank-so` | hosted zone, query log group + policy + config (5 resources) | Records, legacy web records, redirect and alarm are driven by the inventory/variables (below). |
-| `ebanking` | zone, 2 health checks, 2 failover records, alarms, query log | Not used until after `amalbank.so`. `enable_failover_test` adds the simulation pair. |
+| `ebanking` | zone, 2 health checks, 2 failover records, alarms, apex NS TTL, query log (12 resources) | Applied. The secondary record is not gated by its health check (Route 53 cannot reach it; see the runbook). `enable_failover_test` adds the simulation pair (off). |
 
 ## amalbank.so stack: direct delegation at the registrar
 
