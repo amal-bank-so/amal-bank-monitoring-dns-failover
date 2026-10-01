@@ -1,0 +1,131 @@
+{
+  "meta": {
+    "tool": "verify_zone.py",
+    "account": "029288159395",
+    "zone_id": "Z02483903EQGQQFHLQUL3",
+    "name_servers": [
+      "ns-1337.awsdns-39.org",
+      "ns-1683.awsdns-18.co.uk",
+      "ns-377.awsdns-47.com",
+      "ns-524.awsdns-01.net"
+    ],
+    "web": "legacy",
+    "inventory_source": "Public recursive resolvers (8.8.8.8, 1.1.1.1, 9.9.9.9) on 2026-10-02, NOT an authoritative export; completeness to be confirmed against the Microsoft 365 DNS record list"
+  },
+  "checks": [
+    {
+      "area": "zone",
+      "name": "hosted zone",
+      "status": "PASS",
+      "detail": "Z02483903EQGQQFHLQUL3, 4 name servers: ns-1337.awsdns-39.org, ns-1683.awsdns-18.co.uk, ns-377.awsdns-47.com, ns-524.awsdns-01.net"
+    },
+    {
+      "area": "records",
+      "name": "amalbank.so. A",
+      "status": "PASS",
+      "detail": "ttl 60 values ['34.198.182.201']"
+    },
+    {
+      "area": "records",
+      "name": "amalbank.so. MX",
+      "status": "PASS",
+      "detail": "ttl 60 values ['5 amalbank-so.mail.protection.outlook.com.']"
+    },
+    {
+      "area": "records",
+      "name": "amalbank.so. TXT",
+      "status": "PASS",
+      "detail": "ttl 300 values ['\"v=spf1 include:spf.protection.outlook.com -all\"']"
+    },
+    {
+      "area": "records",
+      "name": "autodiscover.amalbank.so. TXT",
+      "status": "PASS",
+      "detail": "ttl 300 values ['\"autodiscover.outlook.com\"']"
+    },
+    {
+      "area": "records",
+      "name": "www.amalbank.so. A",
+      "status": "PASS",
+      "detail": "ttl 60 values ['34.198.182.201']"
+    },
+    {
+      "area": "apex",
+      "name": "NS values",
+      "status": "PASS",
+      "detail": "4 name servers: ns-1337.awsdns-39.org., ns-1683.awsdns-18.co.uk., ns-377.awsdns-47.com., ns-524.awsdns-01.net."
+    },
+    {
+      "area": "apex",
+      "name": "NS TTL",
+      "status": "PASS",
+      "detail": "900 (expected <= 900, so a rollback takes effect quickly)"
+    },
+    {
+      "area": "apex",
+      "name": "SOA present",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "area": "records",
+      "name": "_984c17a10f6adbb533a09ad195037191.amalbank.so. CNAME",
+      "status": "INFO",
+      "detail": "ACM certificate validation record"
+    },
+    {
+      "area": "records",
+      "name": "_be4e608b1f25121f39d4ba7feddcf586.www.amalbank.so. CNAME",
+      "status": "INFO",
+      "detail": "ACM certificate validation record"
+    },
+    {
+      "area": "authoritative",
+      "name": "TestDNSAnswer amalbank.so. A",
+      "status": "PASS",
+      "detail": "['34.198.182.201']"
+    },
+    {
+      "area": "authoritative",
+      "name": "TestDNSAnswer amalbank.so. MX",
+      "status": "PASS",
+      "detail": "['5 amalbank-so.mail.protection.outlook.com.']"
+    },
+    {
+      "area": "authoritative",
+      "name": "TestDNSAnswer amalbank.so. TXT",
+      "status": "PASS",
+      "detail": "['\"v=spf1 include:spf.protection.outlook.com -all\"']"
+    },
+    {
+      "area": "authoritative",
+      "name": "TestDNSAnswer autodiscover.amalbank.so. TXT",
+      "status": "PASS",
+      "detail": "['\"autodiscover.outlook.com\"']"
+    },
+    {
+      "area": "authoritative",
+      "name": "TestDNSAnswer www.amalbank.so. A",
+      "status": "PASS",
+      "detail": "['34.198.182.201']"
+    },
+    {
+      "area": "authoritative",
+      "name": "unknown name behaviour",
+      "status": "PASS",
+      "detail": "zz-430e6143a6.amalbank.so A -> NXDOMAIN (expected NXDOMAIN, matching the live zone which has no wildcard)"
+    },
+    {
+      "area": "certificate",
+      "name": "amalbank.so (amalbank.so, www.amalbank.so)",
+      "status": "PENDING",
+      "detail": "PENDING_VALIDATION"
+    },
+    {
+      "area": "cloudfront",
+      "name": "redirect distribution",
+      "status": "INFO",
+      "detail": "not created yet"
+    }
+  ]
+}

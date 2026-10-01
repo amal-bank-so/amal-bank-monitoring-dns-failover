@@ -1,0 +1,12 @@
+; amalbank.so as observed through three public recursive resolvers (Google 8.8.8.8,
+; Cloudflare 1.1.1.1, Quad9 9.9.9.9) on 2026-10-02; all three agreed.
+; NOT an authoritative export: public resolvers cannot enumerate a zone, so records that
+; are not answered for the names probed are unknown. Replace with the previous
+; provider's export, or reconcile against the Microsoft 365 DNS record list, when available.
+; Authoritative apex NS/SOA at the time: ns1-ns4.no-ip.com, SOA ns2.no-ip.com serial 2025121001.
+$ORIGIN amalbank.so.
+@            60  IN A     34.198.182.201
+www          60  IN A     34.198.182.201
+@            60  IN MX    5 amalbank-so.mail.protection.outlook.com.
+@            300 IN TXT   "v=spf1 include:spf.protection.outlook.com -all"
+autodiscover 300 IN TXT   "autodiscover.outlook.com"

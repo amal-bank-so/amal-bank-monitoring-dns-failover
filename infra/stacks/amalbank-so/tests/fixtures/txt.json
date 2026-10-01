@@ -1,0 +1,13 @@
+{
+  "verified": true,
+  "source": "terraform test fixture",
+  "exported_at": "2026-10-02T00:00:00Z",
+  "records": [
+    {"name": "@", "type": "TXT", "ttl": 300, "values": ["\"v=spf1 include:spf.protection.outlook.com -all\"", "\"MS=ms12345678\""]},
+    {"name": "long", "type": "TXT", "ttl": 300, "values": ["\"first-string\" \"second-string\""]},
+    {"name": "autodiscover", "type": "TXT", "ttl": 300, "values": ["\"autodiscover.outlook.com\""]},
+    {"name": "_dmarc", "type": "TXT", "ttl": 300, "values": ["\"v=DMARC1; p=none; rua=mailto:dmarc@example.com\""]},
+    {"name": "@", "type": "MX", "ttl": 60, "values": ["5 amalbank-so.mail.protection.outlook.com."]},
+    {"name": "sel", "type": "CNAME", "ttl": 300, "values": ["sel.example.com."]}
+  ]
+}

@@ -1,7 +1,60 @@
 {
   "_comment": "Verified authoritative amalbank.so inventory, populated in Phase 0 from the live No-IP export (NOT from the DigiCert view). 'name' is relative to the zone ('@' = apex, '*' = wildcard); never include the zone name or a trailing dot. 'values' use Route 53 syntax (TXT values include their double quotes; MX is 'priority host.'; CNAME/MX targets are FQDNs with a trailing dot). Do not list apex NS/SOA: AWS generates them.",
-  "verified": false,
-  "source": null,
-  "exported_at": null,
-  "records": []
+  "verified": true,
+  "source": "Public recursive resolvers (8.8.8.8, 1.1.1.1, 9.9.9.9) on 2026-10-02, NOT an authoritative export; completeness to be confirmed against the Microsoft 365 DNS record list",
+  "exported_at": "2026-10-02T00:00:00Z",
+  "_conversion": {
+    "tool": "bind_to_inventory.py 1.0",
+    "zone": "amalbank.so",
+    "input_sha256": "ec18004ff0be45b4b81948ea6d86ec89d87dfbf21b82d21c41edc82481d425e3",
+    "record_sets": 3,
+    "values": 3,
+    "skipped_apex_ns_soa": 0,
+    "unsupported": 0,
+    "warnings": 0,
+    "excluded_exceptions": [
+      {
+        "name": "@",
+        "type": "A",
+        "ttl": 60,
+        "values": [
+          "34.198.182.201"
+        ]
+      },
+      {
+        "name": "www",
+        "type": "A",
+        "ttl": 60,
+        "values": [
+          "34.198.182.201"
+        ]
+      }
+    ]
+  },
+  "records": [
+    {
+      "name": "@",
+      "type": "MX",
+      "ttl": 60,
+      "values": [
+        "5 amalbank-so.mail.protection.outlook.com."
+      ]
+    },
+    {
+      "name": "@",
+      "type": "TXT",
+      "ttl": 300,
+      "values": [
+        "\"v=spf1 include:spf.protection.outlook.com -all\""
+      ]
+    },
+    {
+      "name": "autodiscover",
+      "type": "TXT",
+      "ttl": 300,
+      "values": [
+        "\"autodiscover.outlook.com\""
+      ]
+    }
+  ]
 }

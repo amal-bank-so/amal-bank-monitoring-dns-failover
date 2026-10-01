@@ -1,0 +1,8 @@
+{
+  "verified": true,
+  "source": "terraform test fixture",
+  "exported_at": "2026-10-02T00:00:00Z",
+  "records": [
+    {"name": "@", "type": "TXT", "ttl": 300, "values": ["v=spf1 -all"]}
+  ]
+}

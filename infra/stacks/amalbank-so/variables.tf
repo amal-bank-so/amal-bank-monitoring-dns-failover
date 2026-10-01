@@ -53,16 +53,34 @@ variable "query_log_retention_days" {
 # The verified record inventory lives in inventory/amalbank.so.json. Records are
 # only created when that file says "verified": true (see records.tf).
 
+variable "inventory_file" {
+  description = "Inventory JSON, relative to this stack. Overridden only by the Terraform tests."
+  type        = string
+  default     = "inventory/amalbank.so.json"
+}
+
 # --- amalbank.so redirect ----------------------------------------------------
 
+variable "enable_certificate" {
+  description = "Request the ACM certificate and create its validation CNAMEs in this zone. ACM validates only after the zone is publicly delegated to Route 53 and abandons a request still pending after 72 hours, so request it shortly before delegating."
+  type        = bool
+  default     = false
+}
+
 variable "enable_redirect" {
-  description = "Stage A: create the ACM certificate (+ validation records) and the CloudFront redirect Function."
+  description = "Create the CloudFront redirect Function. Needs the verified redirect behaviour (status, path, query), which has no default."
   type        = bool
   default     = false
 }
 
 variable "enable_redirect_distribution" {
-  description = "Stage B: wait for the certificate to be ISSUED, then create the CloudFront distribution and Route 53 aliases. Requires enable_redirect. Only set once the certificate is issued, which requires the zone to be delegated to Route 53 (the validation CNAMEs live in this zone)."
+  description = "Wait for the certificate to be ISSUED (needs the zone delegated), then create the CloudFront distribution. Requires enable_certificate and enable_redirect. It serves on its own cloudfront.net name and can be tested before any DNS record points at it."
+  type        = bool
+  default     = false
+}
+
+variable "web_use_cloudfront" {
+  description = "Switch the apex/www records from the legacy A records to CloudFront aliases (in place). Requires enable_redirect_distribution. Set false again to roll back to the legacy IP."
   type        = bool
   default     = false
 }
@@ -90,6 +108,29 @@ variable "no_web_records" {
   description = "Explicitly acknowledge that the apex and www should have NO address record before the redirect distribution exists. Without this (or legacy_web_ips) a verified inventory refuses to plan, because delegating would take the website down."
   type        = bool
   default     = false
+}
+
+variable "apex_ns_ttl" {
+  description = "TTL of the zone's apex NS records. Route 53 defaults to 172800 (2 days), which would keep resolvers on this delegation for days after a rollback; lowered so a rollback takes effect in minutes. The name servers themselves are the Route 53 generated ones."
+  type        = number
+  default     = 900
+
+  validation {
+    condition     = var.apex_ns_ttl >= 60 && var.apex_ns_ttl <= 172800
+    error_message = "apex_ns_ttl must be between 60 and 172800."
+  }
+}
+
+variable "enable_web_health_check" {
+  description = "Route 53 HTTP health check against http://amalbank.so/ (any 2xx/3xx is healthy) with an alarm to the shared topic. Observes whatever currently serves the name, legacy or CloudFront. Needs enable_alarms."
+  type        = bool
+  default     = true
+}
+
+variable "nxdomain_alarm_threshold" {
+  description = "NXDOMAIN answers in 5 minutes that raise an alarm. After delegation this reveals names that were expected to exist but are missing from the zone. Internet scanners cause a low background rate, so keep it above that."
+  type        = number
+  default     = 10
 }
 
 variable "redirect_wildcard" {

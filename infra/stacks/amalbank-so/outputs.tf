@@ -12,9 +12,9 @@ output "acm_validation_records" {
 }
 
 output "redirect" {
-  value = local.redirect_enabled ? {
-    certificate_arn = aws_acm_certificate.redirect[0].arn
-    function_arn    = aws_cloudfront_function.redirect[0].arn
+  value = local.cert_enabled || local.function_enabled ? {
+    certificate_arn = local.cert_enabled ? aws_acm_certificate.redirect[0].arn : null
+    function_arn    = local.function_enabled ? aws_cloudfront_function.redirect[0].arn : null
     names           = local.redirect_names
     distribution_id = local.redirect_dist ? aws_cloudfront_distribution.redirect[0].id : null
     distribution_dn = local.redirect_dist ? aws_cloudfront_distribution.redirect[0].domain_name : null
@@ -28,4 +28,8 @@ output "web_records" {
 
 output "query_log_group" {
   value = aws_cloudwatch_log_group.query.name
+}
+
+output "web_health_check_id" {
+  value = var.enable_web_health_check ? aws_route53_health_check.web_http[0].id : null
 }

@@ -68,6 +68,14 @@ Route 53, then point the registrar straight at it. Consequences:
 - Scope note: this covers `amalbank.so` only. `ebanking.amalbankso.com` is a child of `amalbankso.com` (hosted at
   GoDaddy); delegating that whole parent domain is a different, larger change (see section 3).
 
+### Production status for `amalbank.so` (2026-10-01)
+
+Applied to AWS, not delegated: hosted zone `Z02483903EQGQQFHLQUL3` with parity records, monitoring (web health,
+NXDOMAIN safety net) and a pending ACM certificate; verification evidence in `infra/evidence/`. Redirect behaviour
+measured through Route 53 health checks: the legacy service answers HTTP with **301** and **refuses HTTPS (443)**;
+path/query preservation is still unknown. See `docs/RUNBOOK_amalbank_so.md` for the delegation procedure,
+tests and rollback.
+
 ## 3. Decisions needed from you
 
 1. **Source of truth for `amalbank.so`:** provide No-IP access (or a full zone and redirect export) to confirm it is authoritative. Recommended.

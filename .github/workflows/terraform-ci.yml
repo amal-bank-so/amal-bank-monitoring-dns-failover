@@ -31,6 +31,11 @@ jobs:
           python -W error::ResourceWarning -m unittest discover -s infra/tools
       - name: Format check
         run: terraform fmt -check -recursive infra
+      - name: Terraform tests (offline, mock provider)
+        run: |
+          cd infra/stacks/amalbank-so
+          terraform init -backend=false -input=false
+          terraform test
       - name: Validate every stack (no credentials, no backend)
         run: |
           for d in infra/stacks/shared infra/stacks/amalbank-so infra/stacks/ebanking infra/bootstrap; do

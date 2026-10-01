@@ -2,22 +2,28 @@
 # old provider's redirect). Route 53 records cannot redirect URLs.
 #
 # Direct-delegation sequence (the registrar points straight at this zone; the old
-# provider is bypassed, so no validation record is ever needed there):
-#   0. Zone + inventory + legacy web A records (web.tf): a like-for-like parity zone.
-#   1. Delegate at the registrar.
-#   2. Stage A (enable_redirect): certificate and its validation CNAMEs (in this
-#      zone), plus the Function. ACM validates once the zone is publicly delegated.
-#   3. Stage B (enable_redirect_distribution): distribution, then web.tf switches
-#      the apex/www records from the legacy A records to CloudFront aliases.
-# Stage A may also be applied before delegation; ACM keeps retrying validation.
+# provider is bypassed, so nothing is ever added there). Each step is its own flag:
+#   0.             Zone + inventory + legacy web A records (web.tf) = parity zone.
+#   enable_certificate            ACM certificate + validation CNAMEs (in this zone).
+#                                 ACM validates once the zone is publicly delegated, and
+#                                 abandons a request that is still pending after 72 hours.
+#   enable_redirect               The Function. Needs the verified redirect behaviour.
+#   enable_redirect_distribution  Waits for the certificate to be ISSUED, then creates the
+#                                 distribution. It serves on its own *.cloudfront.net name,
+#                                 so it can be tested with the real Host header while the
+#                                 apex/www records still point at the legacy IP.
+#   web_use_cloudfront            Switches the apex/www records (web.tf) from the legacy A
+#                                 records to CloudFront aliases, in place.
 #
 # Names: by default the apex and www, mirroring live behaviour (no wildcard exists
 # today). redirect_wildcard = true switches to the apex and *.amalbank.so instead.
 # A wildcard covers ONE label (a.amalbank.so); deeper names would fail TLS.
 
 locals {
-  redirect_enabled = var.enable_redirect
-  redirect_dist    = var.enable_redirect && var.enable_redirect_distribution
+  cert_enabled     = var.enable_certificate
+  function_enabled = var.enable_redirect
+  redirect_dist    = var.enable_redirect_distribution
+  web_alias        = var.enable_redirect_distribution && var.web_use_cloudfront
 
   redirect_names  = var.redirect_wildcard ? [local.amalbank_zone, "*.${local.amalbank_zone}"] : [local.amalbank_zone, "www.${local.amalbank_zone}"]
   redirect_labels = var.redirect_wildcard ? ["@", "*"] : ["@", "www"]
@@ -27,22 +33,30 @@ locals {
 }
 
 resource "terraform_data" "redirect_guard" {
-  count = var.enable_redirect ? 1 : 0
+  count = var.enable_redirect || var.enable_redirect_distribution || var.web_use_cloudfront ? 1 : 0
 
   lifecycle {
     precondition {
-      condition = (
+      condition = !var.enable_redirect || (
         var.redirect_status_code != null &&
         var.redirect_preserve_path != null &&
         var.redirect_preserve_query != null
       )
       error_message = "Set redirect_status_code, redirect_preserve_path and redirect_preserve_query from the verified live redirect behaviour (plan task 0.7). They have no default on purpose."
     }
+    precondition {
+      condition     = !var.enable_redirect_distribution || (var.enable_certificate && var.enable_redirect)
+      error_message = "enable_redirect_distribution needs enable_certificate and enable_redirect."
+    }
+    precondition {
+      condition     = !var.web_use_cloudfront || var.enable_redirect_distribution
+      error_message = "web_use_cloudfront needs enable_redirect_distribution."
+    }
   }
 }
 
 resource "aws_acm_certificate" "redirect" {
-  count = local.redirect_enabled ? 1 : 0
+  count = local.cert_enabled ? 1 : 0
 
   domain_name               = local.amalbank_zone
   subject_alternative_names = [for n in local.redirect_names : n if n != local.amalbank_zone]
@@ -52,14 +66,13 @@ resource "aws_acm_certificate" "redirect" {
     create_before_destroy = true
   }
 
-  depends_on = [terraform_data.redirect_guard]
 }
 
 # One validation CNAME per non-wildcard name. Names/values are only known after the
 # certificate exists, so for_each keys come from the static name list.
 locals {
-  acm_dvo = local.redirect_enabled ? aws_acm_certificate.redirect[0].domain_validation_options : []
-  acm_validation = local.redirect_enabled ? {
+  acm_dvo = local.cert_enabled ? aws_acm_certificate.redirect[0].domain_validation_options : []
+  acm_validation = local.cert_enabled ? {
     for n in local.acm_validated_names : n => {
       name  = one([for d in local.acm_dvo : d.resource_record_name if d.domain_name == n])
       type  = one([for d in local.acm_dvo : d.resource_record_type if d.domain_name == n])
@@ -100,7 +113,7 @@ resource "aws_acm_certificate_validation" "redirect" {
 }
 
 resource "aws_cloudfront_function" "redirect" {
-  count = local.redirect_enabled ? 1 : 0
+  count = local.function_enabled ? 1 : 0
 
   name    = "${var.name_prefix}-amalbank-so-redirect"
   runtime = "cloudfront-js-2.0"
@@ -173,4 +186,6 @@ resource "aws_cloudfront_distribution" "redirect" {
     ssl_support_method       = "sni-only"
     minimum_protocol_version = "TLSv1.2_2021"
   }
+
+  depends_on = [terraform_data.redirect_guard]
 }

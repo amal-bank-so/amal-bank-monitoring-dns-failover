@@ -3,7 +3,7 @@
 # inventory can never reach Route 53.
 
 locals {
-  inventory         = jsondecode(file("${path.module}/inventory/amalbank.so.json"))
+  inventory         = jsondecode(file("${path.module}/${var.inventory_file}"))
   inventory_records = local.inventory.verified ? local.inventory.records : []
 
   allowed_record_types = ["A", "AAAA", "CAA", "CNAME", "MX", "SRV", "TXT", "NS", "DS"]
@@ -11,10 +11,16 @@ locals {
   records = {
     for r in local.inventory_records :
     "${r.name}|${r.type}" => {
-      fqdn   = r.name == "@" ? local.amalbank_zone : "${r.name}.${local.amalbank_zone}"
-      type   = r.type
-      ttl    = r.ttl
-      values = r.values
+      fqdn = r.name == "@" ? local.amalbank_zone : "${r.name}.${local.amalbank_zone}"
+      type = r.type
+      ttl  = r.ttl
+      # The inventory uses Route 53 syntax (TXT values include their double quotes). The
+      # AWS provider adds the outer quotes itself and takes "" inside a value as the
+      # boundary between 255-byte strings, so: strip the outer quotes and turn the
+      # '" "' between strings into '""'. Other types pass through unchanged.
+      values = contains(["TXT", "SPF"], r.type) ? [
+        for v in r.values : replace(replace(v, "/^\"(.*)\"$/", "$1"), "\" \"", "\"\"")
+      ] : r.values
     }
   }
 
@@ -50,6 +56,14 @@ resource "terraform_data" "inventory_guard" {
     precondition {
       condition     = alltrue([for r in local.inventory_records : !(r.name == "@" && contains(["NS", "SOA"], r.type))])
       error_message = "Do not import apex NS/SOA; Route 53 generates them."
+    }
+    precondition {
+      condition = alltrue([
+        for r in local.inventory_records :
+        alltrue([for v in r.values : startswith(v, "\"") && endswith(v, "\"") && length(v) >= 2])
+        if contains(["TXT", "SPF"], r.type)
+      ])
+      error_message = "TXT/SPF inventory values must be in Route 53 syntax: each string in double quotes (e.g. \"v=spf1 -all\"). bind_to_inventory.py produces this."
     }
     precondition {
       condition     = alltrue([for r in local.inventory_records : r.ttl > 0 && length(r.values) > 0])

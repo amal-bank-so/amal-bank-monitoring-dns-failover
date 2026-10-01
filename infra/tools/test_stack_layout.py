@@ -83,8 +83,8 @@ class Independence(unittest.TestCase):
         assert_absent(self, ("aws_route53", "aws_cloudfront", "aws_acm"), tf_text("shared"), "shared")
 
     def test_amalbank_so_does_not_touch_ebanking(self):
-        assert_absent(self, ("ebanking_zone", "aws_route53_health_check", "amalbankso.com", "aws_route53_zone.ebanking"),
-                      tf_text("amalbank-so"), "amalbank-so")
+        # Its own web health check is fine; anything naming ebanking or the amalbankso.com parent is not.
+        assert_absent(self, ("ebanking", "amalbankso.com", "failover"), tf_text("amalbank-so"), "amalbank-so")
 
     def test_ebanking_does_not_touch_amalbank_so(self):
         assert_absent(self, ("amalbank_zone", "aws_route53_zone.amalbank_so", "aws_cloudfront", "aws_acm"),

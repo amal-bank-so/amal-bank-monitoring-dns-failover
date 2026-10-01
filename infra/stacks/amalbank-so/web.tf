@@ -1,14 +1,14 @@
 # Apex and www address records. One resource, two modes, so the switch from the
 # legacy provider's redirect IP to CloudFront is a single in-place change to the
 # same record (no delete-then-create gap):
-#   before enable_redirect_distribution: A records -> var.legacy_web_ips (parity)
-#   after:                               A + AAAA aliases -> CloudFront
+#   until web_use_cloudfront: A records -> var.legacy_web_ips (parity)
+#   after:                    A + AAAA aliases -> CloudFront
 # Records here are managed outside the inventory; the inventory must not define them.
 
 locals {
   web_labels_legacy = ["@", "www"]
 
-  web_records = local.redirect_dist ? {
+  web_records = local.web_alias ? {
     for pair in setproduct(local.redirect_labels, ["A", "AAAA"]) :
     "${pair[0]}-${pair[1]}" => { label = pair[0], type = pair[1], alias = true }
     } : length(var.legacy_web_ips) > 0 ? {
@@ -20,8 +20,8 @@ locals {
 resource "terraform_data" "web_guard" {
   lifecycle {
     precondition {
-      condition     = !local.inventory.verified || local.redirect_dist || length(var.legacy_web_ips) > 0 || var.no_web_records
-      error_message = "The inventory is verified but the apex/www would have no address record. Set legacy_web_ips from the export (they are excluded from the inventory with bind_to_inventory.py --exclude), enable the redirect distribution, or acknowledge with no_web_records = true."
+      condition     = !local.inventory.verified || local.web_alias || length(var.legacy_web_ips) > 0 || var.no_web_records
+      error_message = "The inventory is verified but the apex/www would have no address record. Set legacy_web_ips from the export (they are excluded from the inventory with bind_to_inventory.py --exclude), switch the web records to CloudFront (web_use_cloudfront), or acknowledge with no_web_records = true."
     }
   }
 }

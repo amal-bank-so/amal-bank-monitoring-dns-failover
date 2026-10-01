@@ -3,9 +3,10 @@
 Terraform for the AWS side of the migration described in
 [`docs/MIGRATION_PLAN.md`](../docs/MIGRATION_PLAN.md).
 
-**Status:** only `infra/bootstrap` has been applied (S3 state bucket
-`amal-dns-tfstate-029288159395`, 2026-10-01). The three stacks below have **not** been applied; their
-plans were run read-only against account `029288159395`.
+**Status (2026-10-01):** applied to account `029288159395`: `bootstrap` (state bucket), `shared` (alert topic, no
+subscribers yet) and `amalbank-so` (parity zone, monitoring and a pending certificate; **not delegated**, so
+nothing the public sees has changed). `ebanking` is not applied. The step-by-step for delegating and testing is
+[`docs/RUNBOOK_amalbank_so.md`](../docs/RUNBOOK_amalbank_so.md).
 
 ```
 infra/
@@ -37,22 +38,26 @@ log resource policies keep them independent. `tools/test_stack_layout.py` enforc
 The registrar is pointed straight at the Route 53 zone, bypassing No-IP and DNS Made Easy, so nothing needs to
 be added at the old providers. The old zone stays untouched as the rollback target. Sequence:
 
-1. **Parity zone** (no delegation yet): hosted zone, query logging, the record inventory, and the apex/www `A`
-   records pointing at the legacy redirect IP (`legacy_web_ips`, TTL 60). Convert the verified export with
-   `tools/bind_to_inventory.py --exclude @:A --exclude www:A` (those two are managed in `web.tf`, not the
-   inventory), review, set `"verified": true`. A verified inventory with no web address refuses to plan.
-2. **Delegate at the registrar** to exactly the four name servers of this zone. Web visitors see no change
-   because the apex/www still point at the same IP.
-3. **Redirect stage A** (`enable_redirect=true` plus `redirect_status_code`, `redirect_preserve_path`,
-   `redirect_preserve_query`, which have no defaults): ACM certificate, its validation CNAMEs (created in this
-   zone; ACM validates once the zone is delegated) and the CloudFront Function.
-4. **Redirect stage B** (`enable_redirect_distribution=true`, after the certificate is ISSUED): distribution,
-   then `web.tf` switches the apex/www records in place from the legacy `A` records to CloudFront aliases
-   (A + AAAA) and a 5xx alarm to the shared topic is added. The switch is one change to the same record; the
-   plan must show `~ update in-place`. **If it shows a replace, stop.**
+1. **Parity zone** (applied, no delegation yet): hosted zone, query logging, the record inventory, the apex/www
+   `A` records pointing at the legacy redirect IP (`legacy_web_ips`, TTL 60), the apex NS TTL lowered to 900 s,
+   an HTTP health check, and alarms (web health, NXDOMAIN answers) to the shared topic. The inventory is converted
+   with `tools/bind_to_inventory.py --exclude @:A --exclude www:A` (apex/www are managed in `web.tf`, not the
+   inventory). A verified inventory with no web address refuses to plan.
+2. **`enable_certificate`** (applied): ACM certificate and its validation CNAMEs in this zone. ACM validates once the
+   zone is delegated and abandons a request still pending after 72 hours.
+3. **Delegate at the registrar** to exactly the four name servers of this zone. Visitors see no change because the
+   apex/www still point at the same IP.
+4. **`enable_redirect`**: the CloudFront Function (needs `redirect_status_code`, `redirect_preserve_path`,
+   `redirect_preserve_query`, which have no defaults).
+5. **`enable_redirect_distribution`** (needs the certificate ISSUED, i.e. the zone delegated): the distribution, which
+   serves on its own `cloudfront.net` name so it can be tested with `tools/check_web.sh --cloudfront` before any
+   record points at it.
+6. **`web_use_cloudfront`**: `web.tf` switches the apex/www records in place from the legacy `A` records to
+   CloudFront aliases (A + AAAA). The plan must show `~ update in-place`; **if it shows a replace, stop.**
 
-Rollback of step 4 is setting `enable_redirect_distribution=false` (records revert to the legacy IP, TTL 60);
-rollback of step 2 is restoring the original registrar nameservers (bounded by delegation cache lifetimes).
+Rollback of step 6 is `web_use_cloudfront = false` (records revert to the legacy IP, TTL 60); rollback of step 3 is
+restoring the original registrar nameservers (bounded by delegation cache lifetimes). Production settings live in
+`stacks/amalbank-so/terraform.tfvars`.
 
 By default the redirect covers the apex and `www`, mirroring live behaviour (no wildcard exists today).
 `redirect_wildcard=true` switches to apex + `*.amalbank.so`, which changes behaviour (unknown names stop
@@ -76,7 +81,7 @@ terraform plan -out=tfplan      # review, get approval, then apply the saved pla
 ```
 
 Repeat per stack (each has its own `backend.hcl.example`). Offline checks, no credentials needed:
-`terraform init -backend=false && terraform validate` in each stack; `node --test infra/tools/redirect.test.mjs`;
+`terraform init -backend=false && terraform validate` in each stack; `terraform test` in `stacks/amalbank-so`; `node --test infra/tools/redirect.test.mjs`;
 `python -m unittest discover -s infra/tools`. CI runs all of them.
 
 ## Tools (`infra/tools/`)
@@ -112,6 +117,21 @@ run unless the targets are the TEST-NET test pair with CLOUDWATCH_METRIC health 
 and always restores healthy state. It never touches the live ebanking records, health checks or alarms. It
 does **not** test alert delivery (the test alarms deliberately notify nobody); that is a separate,
 owner-approved check.
+
+### `verify_zone.py`: zone verification
+
+`verify_zone.py pre` compares the zone with the inventory using Route 53's own authoritative answers
+(`TestDNSAnswer`; no delegation needed): every record, TTLs, the four apex name servers, no unexpected records,
+and NXDOMAIN for unknown names. `verify_zone.py post [--wait SECONDS] [--web cloudfront]` adds public-resolver
+checks (Google, Cloudflare, Quad9: is the delegation visible, do answers match) and certificate / distribution
+state. Results are PASS, FAIL, PENDING (e.g. a resolver still caching the old delegation) or INFO; evidence is
+written to `infra/evidence/`.
+
+### `check_web.sh`: website checks from your network
+
+Run where the domain is reachable. It does not follow redirects and prints status, `Location`, cache headers and
+TLS details for the apex, www, a path-and-query URL, HEAD and POST. Run it before delegation to capture the legacy
+behaviour, with `--cloudfront <domain>` to test the new distribution before switching DNS, and after the switch.
 
 ## Known limitations / to verify in Phase 2
 
