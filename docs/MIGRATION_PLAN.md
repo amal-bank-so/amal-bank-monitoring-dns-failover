@@ -33,6 +33,22 @@ These were observed from public resolvers only. Direct queries to authoritative 
 | Separate destination site | `amalbankso.so` resolves to `167.235.241.124`. `www` is a CNAME to it. | This is the redirect target. It is not changed. |
 | Names | `amalbank.so`, `amalbankso.com` and `amalbankso.so` are all distinct and in use. | Preserve exactly. |
 
+### Live `amalbank.so` snapshot (public resolvers, 2026-10-02)
+
+| Name | Type | TTL | Value |
+|---|---|---|---|
+| `@` | A | 60 | `34.198.182.201` (likely the No-IP redirect service) |
+| `www` | A | 60 | `34.198.182.201` |
+| `@` | MX | 60 | `5 amalbank-so.mail.protection.outlook.com.` |
+| `@` | TXT | 300 | `"v=spf1 include:spf.protection.outlook.com -all"` |
+| `autodiscover` | **TXT** | 300 | `"autodiscover.outlook.com"` (a TXT, not the CNAME seen in the DigiCert view; Outlook autodiscover normally needs a CNAME, so this is probably non-functional today) |
+| `@` | NS / SOA | 21600 / 1800 | `ns1-ns4.no-ip.com`; SOA serial 2025121001, negative TTL 1800 |
+
+- **No wildcard is live:** random labels (`zzq-probe-91827.amalbank.so`, also two levels deep) return NXDOMAIN. The DigiCert redirect entries for `*` are therefore not current behaviour. Decision needed: mirror live (apex + `www` only) or add a wildcard.
+- No DKIM (`selector1/2._domainkey`), DMARC, SRV, CAA or DS records found for the common names probed. The authoritative export must confirm, because public probing cannot enumerate a zone.
+- Redirect status and path/query behaviour could not be tested from the sandbox (outbound HTTP to the domain is blocked); the owner must supply it (task 0.7).
+- Record TTLs are already 60-300 s; the only long cache is the NS delegation (21600 s at the child, parent-side TTL still to be measured).
+
 Delegation cache lifetimes to plan around: NS TTL 21600 (6 h) as seen at the child, parent-side delegation TTLs still to be measured (TLDs typically use 24-48 h), and the ebanking A record at 1800 s.
 
 ## 3. Decisions needed from you
