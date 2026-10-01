@@ -25,3 +25,8 @@ enable_redirect_distribution = true
 # issue the certificate), then point apex/www at CloudFront with web_use_cloudfront (rollback: false).
 enable_redirect_aliases = true
 web_use_cloudfront        = true
+
+# Background NXDOMAIN noise (browser/resolver random-label probes, mail receivers asking for _dmarc,
+# which never existed here or at the previous provider) reached 24 per 5 minutes while resolvers
+# were moving over, so the default of 10 was far too sensitive.
+nxdomain_alarm_threshold = 100

@@ -84,3 +84,23 @@ No-IP before the observation period ends and you have approved it.
   MX, SPF and `autodiscover` unchanged. Resolvers still holding the old delegation or the old 60 s records move over as
   their caches expire. Rollback: `web_use_cloudfront = false` (back to the legacy IP, TTL 60) or restore the registrar
   nameservers. Observation period: at least 7 days; No-IP stays active and unchanged.
+- 2026-10-01 21:35Z: independent end-to-end check from Route 53's 16 locations against `https://amalbank.so/some/path?x=1`
+  (temporary health check, deleted): 6 of 16 already resolve to CloudFront and receive 301 over HTTPS; 10 of 16 still
+  reach the legacy IP (HTTPS refused), i.e. propagation is in progress and expected to finish as resolver caches expire.
+- NXDOMAIN alarm fired at the default threshold (10 per 5 min) on background noise: random-label resolver/browser probes,
+  mail receivers asking for `_dmarc.amalbank.so` (never existed here or at the previous provider), `_mta-sts`,
+  `www.www`. No expected record was missing. Threshold raised to 100 per 5 min.
+
+## Completion status (against the migration brief)
+
+| Requirement | Status |
+|---|---|
+| Zone built, records match the inventory, authoritative answers verified | Done (`infra/evidence/verify-zone-pre-*.md`) |
+| Delegation to Route 53 at the registrar | Done (propagating; in progress for ~10 of 16 vantage points) |
+| Redirect on CloudFront, certificate, TLS | Done and answering (301 over HTTP and HTTPS where resolved) |
+| Record completeness against the previous provider's export | **Pending, owner: you.** Inventory was built from public answers, not an export |
+| Inbound and outbound test mail | **Pending, owner: you** (needs an approved mailbox) |
+| Alert delivery | **Not performed**: no subscribers, by decision |
+| Redirect path/query behaviour matches the legacy service | **Unverified** (preserved by assumption) |
+| 7+ stable days of observation, longer than the longest delegation cache | **Pending** (earliest 2026-10-08) |
+| Retire No-IP | **Not before** the observation period ends and you approve |
