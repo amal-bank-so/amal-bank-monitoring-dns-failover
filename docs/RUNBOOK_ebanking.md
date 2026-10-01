@@ -84,6 +84,8 @@ observation period ends and you approve.
   OK. Resolvers that cached the DigiCert delegation move over as their caches expire (up to 21600 s plus the parent TTL); both
   providers answer identically meanwhile. Observation period: at least 7 days (earliest 2026-10-08); keep DigiCert unchanged.
 
+- 2026-10-01 23:26Z: re-check. Route 53 vantage points on the AWS zone: 11 of 16; 609 queries answered in 2 h from many resolvers, all NOERROR except 54 NXDOMAIN, which are the temporary probe names plus one `www.ebanking` lookup (the old zone had no `www` either). Primary healthy from 15/15 locations; secondary still blocked by its firewall (alarm `secondary-unhealthy` in ALARM as documented). Route 53 answers 37.34.133.35. Terraform drift none.
+
 ## Completion status (against the migration brief)
 
 | Requirement | Status |

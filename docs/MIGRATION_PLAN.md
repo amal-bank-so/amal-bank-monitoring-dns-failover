@@ -1,4 +1,5 @@
 # Amal Bank DNS migration to AWS: plan and task list (for approval)
+> **Superseded in part:** the live state, decisions and status of both domains are in `CLAUDE.md`, `docs/RUNBOOK_amalbank_so.md` and `docs/RUNBOOK_ebanking.md`. This file is the original plan.
 
 Status: **DRAFT, awaiting approval. AWS access verified. No AWS or DNS changes have been made.**
 Prepared: 2026-09-30. Scope follows the supplied migration prompt: DNS hosting, ebanking failover, website redirects and monitoring only. Banking endpoints, Microsoft 365, the destination site and domain registration are untouched.

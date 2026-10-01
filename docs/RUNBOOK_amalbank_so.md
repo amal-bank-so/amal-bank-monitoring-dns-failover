@@ -91,6 +91,8 @@ No-IP before the observation period ends and you have approved it.
   mail receivers asking for `_dmarc.amalbank.so` (never existed here or at the previous provider), `_mta-sts`,
   `www.www`. No expected record was missing. Threshold raised to 100 per 5 min.
 
+- 2026-10-01 23:26Z: re-check. Route 53 vantage points on the AWS zone: 9 of 15; https://amalbank.so served by CloudFront from 7 of 16 locations (rest still draining caches). 1330 queries answered by the zone in 2 h, no errors beyond expected NXDOMAIN noise. All alarms OK, certificate ISSUED, distribution Deployed, Terraform drift none.
+
 ## Completion status (against the migration brief)
 
 | Requirement | Status |
