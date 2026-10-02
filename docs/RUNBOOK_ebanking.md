@@ -88,6 +88,8 @@ observation period ends and you approve.
 
 - 2026-10-02 03:48Z: re-check. 2603 queries answered by the zone since go-live (last hour: 439 from 358 resolvers), 2539 NOERROR and 64 NXDOMAIN, of which 12 are non-probe (`www.ebanking` A/AAAA/CAA and `_dmarc.ebanking`, none of which existed at DigiCert either). Route 53 vantage points on the AWS zone: 11 of 16 (unchanged, plateaued for the same reason as amalbank.so). Primary healthy 16/16, secondary still blocked by its firewall (alarm in ALARM as documented), Route 53 answers 37.34.133.35, no Terraform drift.
 
+- 2026-10-02 04:20Z: scheduled hourly re-check. 3033 queries since go-live; last hour 640 queries from 537 resolvers (608 NOERROR, 32 NXDOMAIN, all `www.ebanking`/`_dmarc` style lookups that never existed at DigiCert). Primary 16/16 healthy, secondary still blocked by its firewall (alarm `secondary-unhealthy` in ALARM as documented), Route 53 answers 37.34.133.35, no Terraform drift.
+
 ## Completion status (against the migration brief)
 
 | Requirement | Status |
