@@ -93,6 +93,8 @@ No-IP before the observation period ends and you have approved it.
 
 - 2026-10-01 23:26Z: re-check. Route 53 vantage points on the AWS zone: 9 of 15; https://amalbank.so served by CloudFront from 7 of 16 locations (rest still draining caches). 1330 queries answered by the zone in 2 h, no errors beyond expected NXDOMAIN noise. All alarms OK, certificate ISSUED, distribution Deployed, Terraform drift none.
 
+- 2026-10-02 03:48Z: re-check. 3991 queries answered by the zone since go-live (last hour: 412 from 162 resolvers), all NOERROR except 217 NXDOMAIN, all background noise (`_dmarc`, `_mta-sts`, `www.www`, random labels). Route 53 vantage points on the AWS zone: 6 of 16 (earlier 9 of 15, so the figure is noisy and has plateaued); https://amalbank.so via CloudFront 7 of 16; web health check 16/16 `301`; alarms OK; certificate ISSUED; distribution Deployed; no Terraform drift. Propagation has plateaued because resolvers that cached the old delegation keep refreshing it from the old provider's servers (No-IP still serves its zone and its NS records); this is harmless while both zones are identical and ends when the old zone is retired after the observation period.
+
 ## Completion status (against the migration brief)
 
 | Requirement | Status |

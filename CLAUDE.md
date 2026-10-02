@@ -22,14 +22,14 @@ Amal Bank DNS migration to AWS Route 53 (`amalbank.so` and `ebanking.amalbankso.
 7. **No secrets in the repo** (state files, `backend.hcl`, `*.tfplan`, keys are git-ignored). Never print credentials.
 8. Be honest in reports: say what was not done or not proven, and correct earlier mistakes when found.
 
-## Current state (2026-10-01)
+## Current state (checked 2026-10-02)
 
 | | `amalbank.so` | `ebanking.amalbankso.com` |
 |---|---|---|
 | Previous provider | No-IP (5 records: URL redirects, MX, SPF, autodiscover TXT) | DigiCert DNS Made Easy (single apex A + failover) |
 | Route 53 zone | `Z02483903EQGQQFHLQUL3` | `Z01112481OCSOFIT54YT1` |
 | Delegation | Registrar -> `ns-1337.awsdns-39.org`, `ns-1683.awsdns-18.co.uk`, `ns-377.awsdns-47.com`, `ns-524.awsdns-01.net` | Child NS at GoDaddy (`amalbankso.com`) -> `ns-1273.awsdns-31.org`, `ns-1926.awsdns-48.co.uk`, `ns-379.awsdns-47.com`, `ns-827.awsdns-39.net` |
-| Status | **Live**, propagating (about 9 of 16 Route 53 vantage points on AWS) | **Live**, propagating (about 11 of 16) |
+| Status | **Live** (as of 2026-10-02 03:48Z about 6 of 16 Route 53 vantage points on AWS, CloudFront reached from 7 of 16) | **Live** (about 11 of 16 vantage points on AWS) |
 | What it serves | Apex/www -> CloudFront redirect (301 to `https://www.amalbankso.so`, path+query preserved), MX 5 (M365), SPF, autodiscover TXT | Apex A: PRIMARY `37.34.133.35`, SECONDARY `91.140.155.171`, TTL 1800 |
 | Runbook | `docs/RUNBOOK_amalbank_so.md` | `docs/RUNBOOK_ebanking.md` |
 
@@ -37,6 +37,10 @@ Applied stacks (all in `infra/stacks/`, separate S3 state in `amal-dns-tfstate-0
 `amalbank-so`, `ebanking`. A drift check (`terraform plan -detailed-exitcode`) shows repo = AWS. The runbooks hold the
 status logs and completion tables; they are the source of truth (`docs/MIGRATION_PLAN.md` is the original plan and is
 partly superseded).
+
+Propagation note: the share of resolvers on the AWS zone has plateaued (about 6/16 and 11/16 vantage points). Resolvers that
+cached the old delegation keep refreshing it from the old provider's servers, which still serve identical data, so this is
+harmless and only completes when the old zones are retired after the observation period. Do not treat the plateau as a failure.
 
 ### Open items
 - Outbound test mail from an `@amalbank.so` mailbox (inbound passed 2026-10-01).
