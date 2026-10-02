@@ -90,6 +90,8 @@ observation period ends and you approve.
 
 - 2026-10-02 04:20Z: scheduled hourly re-check. 3033 queries since go-live; last hour 640 queries from 537 resolvers (608 NOERROR, 32 NXDOMAIN, all `www.ebanking`/`_dmarc` style lookups that never existed at DigiCert). Primary 16/16 healthy, secondary still blocked by its firewall (alarm `secondary-unhealthy` in ALARM as documented), Route 53 answers 37.34.133.35, no Terraform drift.
 
+- 2026-10-02 05:06Z: re-check. 3343 queries since go-live; last hour 437 from 367 resolvers (434 NOERROR, 3 NXDOMAIN, all `www.ebanking`, which never existed at DigiCert). Primary 16/16 healthy, secondary still blocked by its firewall (alarm in ALARM as documented), Route 53 answers 37.34.133.35, no Terraform drift.
+
 ## Completion status (against the migration brief)
 
 | Requirement | Status |

@@ -97,6 +97,8 @@ No-IP before the observation period ends and you have approved it.
 
 - 2026-10-02 04:20Z: scheduled hourly re-check (query logs and permanent checks only). 4348 queries since go-live; last hour 589 queries from 293 resolvers (486 NOERROR, 103 NXDOMAIN, all background noise such as random labels and `admin.amalbank.so` probes, which never existed). Web health check 16/16 `301`; Route 53 answers CloudFront addresses for www; alarms OK; certificate ISSUED; distribution Deployed; no Terraform drift.
 
+- 2026-10-02 05:06Z: re-check. 4636 queries since go-live; last hour 397 from 116 resolvers (381 NOERROR, 16 NXDOMAIN, almost all one random label `zdydntxt.amalbank.so`). Web health check 16/16 `301`; www answers CloudFront addresses; alarms OK; certificate ISSUED; distribution Deployed; no Terraform drift.
+
 ## Completion status (against the migration brief)
 
 | Requirement | Status |
