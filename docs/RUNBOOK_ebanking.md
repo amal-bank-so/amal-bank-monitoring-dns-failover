@@ -104,6 +104,8 @@ observation period ends and you approve.
 
 - 2026-10-03: **email notifications deployed** (SendGrid via Lambda `amal-dns-notify`, key read from Secrets Manager `SendGrid_API` in eu-west-1). Exactly three e-banking emails: HIGH Failover from Primary (Zain) to Secondary (FastTelco) (new composite alarm `amal-dns-ebanking-failover`: primary unhealthy AND secondary healthy), HIGH Primary (Zain) is Back (`primary-unhealthy` alarm -> OK), CRITICAL E-Banking is Down (`both-unhealthy` -> ALARM). Lambda self-test from inside AWS: SendGrid key valid with mail.send permission, sender configured. **No recipients configured yet, so nothing is sent**; add them in `stacks/shared/terraform.tfvars` (`notification_recipients`) or the secret's `SENDGRID_TO_EMAILS`. Logo pending (`lambda/logo.png`). All four ebanking alarms OK, no Terraform drift.
 
+- 2026-10-03: notifier updated: recipients are read from the Secrets Manager secret `SENDGRID_TO_EMAILS` (eu-west-1; 1 recipient configured), and the email header logo is read from the private S3 bucket `amal-dns-notify-assets-029288159395` (object `logo.png`, **not uploaded yet**, so emails use the text header until it is). Lambda self-test: SendGrid key valid with mail.send, sender configured, recipients 1, logo_found false. No email has been sent. No Terraform drift.
+
 ## Completion status (against the migration brief)
 
 | Requirement | Status |
@@ -115,6 +117,6 @@ observation period ends and you approve.
 | Failover exercised against the live endpoints | **Not done, by design.** Isolated test pair exists but is off |
 | Failback and both-down behaviour demonstrated | **Not demonstrated** (documented Route 53 behaviour only) |
 | Banking TLS and application-level checks (login/read) | **Pending, owner: you** (needs an approved test account; no transactions) |
-| Alert delivery | **Built and self-tested; not yet sending**: needs recipients (and the logo file); no real alarm has been triggered to prove delivery end to end |
+| Alert delivery | **Built, recipients configured, self-tested; not yet proven end to end**: no real alarm has fired, and the logo is not uploaded yet |
 | 7+ stable days of observation | **Pending** (earliest 2026-10-08) |
 | Retire DigiCert | **Not before** the observation period ends and you approve |

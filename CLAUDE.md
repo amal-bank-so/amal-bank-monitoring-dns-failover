@@ -50,14 +50,17 @@ through SendGrid and sends **only** these three: **HIGH - Failover from Primary 
 (`amal-dns-ebanking-primary-unhealthy` -> OK), **CRITICAL - E-Banking is Down** (`amal-dns-ebanking-both-unhealthy` -> ALARM). All other
 alarms (amalbank.so, secondary-unhealthy, ...) stay in the CloudWatch console and send nothing. The SendGrid key and sender are read at run
 time from Secrets Manager secret `SendGrid_API` in **eu-west-1** (fields `SENDGRID_API_KEY`, `SENDGRID_FROM_EMAIL`; the field name has a
-stray leading space, the Lambda strips it); the Lambda role can read only that secret. Recipients: Terraform `notification_recipients`
-(`stacks/shared/terraform.tfvars`) and/or an optional `SENDGRID_TO_EMAILS` field in the secret (comma separated, no deployment). Rebuild the
-zip with `python infra/stacks/shared/lambda/build.py` after editing `notify.py` or adding `lambda/logo.png` (the Amal Bank logo, embedded in
-the email header when present), commit the zip, then apply. Self-test without sending mail: invoke the Lambda with `{"selftest": true}`.
+stray leading space, the Lambda strips it) and recipients from secret `SENDGRID_TO_EMAILS` (also eu-west-1, JSON field `SENDGRID_TO_EMAILS`,
+comma separated: edit it any time, no deployment; 1 recipient at `amalbankso.so` as of 2026-10-03). The Lambda role can read only those two
+secrets, the logo object, and write its own logs. Logo: private bucket `amal-dns-notify-assets-029288159395`, object `logo.png`, read on every
+email (upload or replace it, no deployment); falls back to a bundled `lambda/logo.png`, then to a plain navy "Amal Bank" text header. The
+logo image sent in chat never reached the sandbox as a file, so the owner (or a file attachment) must provide it. After editing `notify.py`
+run `python infra/stacks/shared/lambda/build.py`, commit the zip, then apply. Self-test (sends no mail, reports `recipients` and `logo_found`):
+invoke the Lambda with `{"selftest": true}`.
 
 ### Open items
-- **Notification recipients are not set yet**, so no email is sent until addresses are added (see above). **`lambda/logo.png` is not in the repo
-  yet**: the owner's logo image was only shown in chat; save it as `infra/stacks/shared/lambda/logo.png`, rebuild the zip and apply.
+- **Logo not uploaded yet**: upload the Amal Bank logo PNG to `s3://amal-dns-notify-assets-029288159395/logo.png` (the bucket exists; the Lambda
+  logs `logo_found: false` until then and sends the text header). No email has been sent yet and no real alarm has proven delivery end to end.
 - Outbound test mail from an `@amalbank.so` mailbox (inbound passed 2026-10-01).
 - Redirect path/query behaviour vs the legacy No-IP redirect is **assumed** (preserved); No-IP redirected to the `http://`
   address, AWS redirects to `https://` on purpose.

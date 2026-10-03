@@ -29,9 +29,14 @@ resource "aws_iam_role" "notify" {
 
 data "aws_iam_policy_document" "notify" {
   statement {
-    sid       = "ReadOnlyTheSendGridSecret"
+    sid       = "ReadOnlyTheNotificationSecrets"
     actions   = ["secretsmanager:GetSecretValue"]
-    resources = [var.sendgrid_secret_arn]
+    resources = compact([var.sendgrid_secret_arn, var.recipients_secret_arn])
+  }
+  statement {
+    sid       = "ReadTheLogo"
+    actions   = ["s3:GetObject"]
+    resources = ["${aws_s3_bucket.assets.arn}/${var.logo_key}"]
   }
   statement {
     sid       = "WriteOwnLogs"
@@ -64,12 +69,15 @@ resource "aws_lambda_function" "notify" {
 
   environment {
     variables = {
-      SECRET_ARN      = var.sendgrid_secret_arn
-      RECIPIENTS      = join(",", var.notification_recipients)
-      SUBJECT_PREFIX  = var.notification_subject_prefix
-      PRIMARY_LABEL   = var.ebanking_primary_label
-      SECONDARY_LABEL = var.ebanking_secondary_label
-      CONSOLE_REGION  = var.aws_region
+      SECRET_ARN            = var.sendgrid_secret_arn
+      RECIPIENTS_SECRET_ARN = var.recipients_secret_arn
+      RECIPIENTS            = join(",", var.notification_recipients)
+      ASSET_BUCKET          = aws_s3_bucket.assets.bucket
+      LOGO_KEY              = var.logo_key
+      SUBJECT_PREFIX        = var.notification_subject_prefix
+      PRIMARY_LABEL         = var.ebanking_primary_label
+      SECONDARY_LABEL       = var.ebanking_secondary_label
+      CONSOLE_REGION        = var.aws_region
     }
   }
 
@@ -91,3 +99,52 @@ resource "aws_sns_topic_subscription" "notify" {
 
   depends_on = [aws_lambda_permission.from_sns]
 }
+
+# Private bucket for the email logo: upload (or replace) the object `logo_key` and the next notification uses it, no deployment
+# needed. The notify Lambda can read exactly that one object; nothing else is stored here.
+resource "aws_s3_bucket" "assets" {
+  bucket = "${var.name_prefix}-notify-assets-${data.aws_caller_identity.current.account_id}"
+}
+
+resource "aws_s3_bucket_public_access_block" "assets" {
+  bucket                  = aws_s3_bucket.assets.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "assets" {
+  bucket = aws_s3_bucket.assets.id
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+data "aws_iam_policy_document" "assets_tls_only" {
+  statement {
+    sid       = "DenyInsecureTransport"
+    effect    = "Deny"
+    actions   = ["s3:*"]
+    resources = [aws_s3_bucket.assets.arn, "${aws_s3_bucket.assets.arn}/*"]
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+    condition {
+      test     = "Bool"
+      variable = "aws:SecureTransport"
+      values   = ["false"]
+    }
+  }
+}
+
+resource "aws_s3_bucket_policy" "assets" {
+  bucket = aws_s3_bucket.assets.id
+  policy = data.aws_iam_policy_document.assets_tls_only.json
+
+  depends_on = [aws_s3_bucket_public_access_block.assets]
+}
+

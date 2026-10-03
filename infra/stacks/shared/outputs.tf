@@ -19,3 +19,8 @@ output "notification_recipients" {
   description = "Recipients configured in Terraform (the secret may add more through SENDGRID_TO_EMAILS)."
   value       = sort(var.notification_recipients)
 }
+
+output "logo_location" {
+  description = "Upload the Amal Bank logo PNG here to use it in notification emails (no deployment needed)."
+  value       = "s3://${aws_s3_bucket.assets.bucket}/${var.logo_key}"
+}

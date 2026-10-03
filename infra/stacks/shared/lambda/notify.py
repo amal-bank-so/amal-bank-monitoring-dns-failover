@@ -12,10 +12,12 @@ repository):
 
     {"SENDGRID_API_KEY": "...", "SENDGRID_FROM_EMAIL": "...", "SENDGRID_TO_EMAILS": "a@x.com,b@y.com"}   # last field optional
 
-Recipients are the RECIPIENTS environment variable (comma separated, from Terraform) plus the optional SENDGRID_TO_EMAILS
-secret field, so recipients can be added without a deployment. Each recipient gets their own personalization, so addresses
-are not exposed to each other. A failed send raises, so SNS retries the delivery. If a logo.png is bundled next to this file it
-is embedded in the email header.
+Recipients are the union of: the RECIPIENTS environment variable (comma separated, from Terraform), the optional SENDGRID_TO_EMAILS
+field of the SendGrid secret, and the secret named by RECIPIENTS_SECRET_ARN (JSON with a SENDGRID_TO_EMAILS field, or a plain
+comma separated string), so recipients can be added without a deployment. Each recipient gets their own personalization, so addresses
+are not exposed to each other. A failed send raises, so SNS retries the delivery. The Amal Bank logo is embedded in the email header from, in order: the S3 object
+ASSET_BUCKET/LOGO_KEY (upload or replace it any time, no deployment needed), a logo.png bundled next to this file, or a plain
+text header if neither exists.
 
 A direct invocation with {"selftest": true} checks the secret, the key and the outbound path (GET /v3/scopes) without sending
 any email.
@@ -33,6 +35,8 @@ LOGO_CID = "amalbank-logo"
 NAVY = "#0a2260"
 SEVERITY_COLOR = {"CRITICAL": "#b71c1c", "HIGH": "#e65100"}
 _secret_cache = None
+_recipients_cache = None
+_logo_cache = None
 
 
 def classify(alarm_name, state):
@@ -63,13 +67,30 @@ def _secret():
     return _secret_cache
 
 
+def _recipients_secret():
+    """Addresses from the optional separate recipients secret (JSON {"SENDGRID_TO_EMAILS": "a,b"} or a plain string)."""
+    global _recipients_cache
+    arn = os.environ.get("RECIPIENTS_SECRET_ARN")
+    if not arn:
+        return ""
+    if _recipients_cache is None:
+        client = boto3.client("secretsmanager", region_name=arn.split(":")[3])
+        raw = client.get_secret_value(SecretId=arn)["SecretString"]
+        try:
+            data = {k.strip(): v for k, v in json.loads(raw).items()}
+            _recipients_cache = data.get("SENDGRID_TO_EMAILS") or ""
+        except (ValueError, AttributeError):
+            _recipients_cache = raw
+    return _recipients_cache
+
+
 def _split(text):
     return [a.strip() for a in (text or "").replace(";", ",").split(",") if a.strip()]
 
 
 def _recipients(secret):
     seen, out = set(), []
-    for a in _split(os.environ.get("RECIPIENTS")) + _split(secret.get("SENDGRID_TO_EMAILS")):
+    for a in _split(os.environ.get("RECIPIENTS")) + _split(secret.get("SENDGRID_TO_EMAILS")) + _split(_recipients_secret()):
         if a.lower() not in seen:
             seen.add(a.lower())
             out.append(a)
@@ -89,14 +110,33 @@ def _request(method, path, key, payload=None):
         return err.code, err.read().decode()[:500]
 
 
+def _logo_bytes():
+    """Logo PNG bytes from S3 (ASSET_BUCKET/LOGO_KEY), else a bundled logo.png, else None."""
+    global _logo_cache
+    if _logo_cache is not None:
+        return _logo_cache or None
+    data = b""
+    bucket = os.environ.get("ASSET_BUCKET")
+    if bucket:
+        try:
+            data = boto3.client("s3").get_object(Bucket=bucket, Key=os.environ.get("LOGO_KEY", "logo.png"))["Body"].read()
+        except Exception as err:  # missing object or no access: fall back, never block a notification
+            print("logo not loaded from S3: %s" % type(err).__name__)
+    if not data and os.path.exists(LOGO_PATH):
+        with open(LOGO_PATH, "rb") as fh:
+            data = fh.read()
+    _logo_cache = data
+    return data or None
+
+
 def _logo_attachment():
-    """The bank logo as an inline (CID) attachment, or None when no logo.png is bundled."""
-    if not os.path.exists(LOGO_PATH):
+    """The bank logo as an inline (CID) attachment, or None when no logo is available."""
+    data = _logo_bytes()
+    if not data:
         return None
     import base64
-    with open(LOGO_PATH, "rb") as fh:
-        return {"content": base64.b64encode(fh.read()).decode(), "type": "image/png", "filename": "amal-bank-logo.png",
-                "disposition": "inline", "content_id": LOGO_CID}
+    return {"content": base64.b64encode(data).decode(), "type": "image/png", "filename": "amal-bank-logo.png",
+            "disposition": "inline", "content_id": LOGO_CID}
 
 
 def render(alarm, severity, title, explanation, has_logo=False):
@@ -134,7 +174,8 @@ def handler(event, context):
         status, body = _request("GET", "/scopes", key)
         scopes = json.loads(body).get("scopes", []) if status == 200 else []
         return {"sendgrid_status": status, "can_send_mail": "mail.send" in scopes,
-                "from_configured": bool(secret.get("SENDGRID_FROM_EMAIL")), "recipients": len(_recipients(secret))}
+                "from_configured": bool(secret.get("SENDGRID_FROM_EMAIL")), "recipients": len(_recipients(secret)),
+                "logo_found": bool(_logo_bytes())}
 
     sender = secret["SENDGRID_FROM_EMAIL"]
     to = _recipients(secret)

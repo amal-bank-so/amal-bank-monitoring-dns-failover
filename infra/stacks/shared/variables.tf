@@ -61,6 +61,18 @@ variable "sendgrid_secret_arn" {
   type        = string
 }
 
+variable "recipients_secret_arn" {
+  description = "Optional ARN of a second Secrets Manager secret holding the recipients (JSON field SENDGRID_TO_EMAILS, comma separated). The notify Lambda's role may read it in addition to the SendGrid secret. Leave empty to use only notification_recipients and the SendGrid secret's own SENDGRID_TO_EMAILS field."
+  type        = string
+  default     = ""
+}
+
+variable "logo_key" {
+  description = "S3 object key of the Amal Bank logo (PNG) in the notify assets bucket. The email header uses it when the object exists."
+  type        = string
+  default     = "logo.png"
+}
+
 variable "ebanking_primary_label" {
   description = "How the primary e-banking endpoint is named in notification emails."
   type        = string
