@@ -10,7 +10,7 @@ step that changes what customers' resolvers use.
 |---|---|
 | Hosted zone | `ebanking.amalbankso.com`, ID `Z01112481OCSOFIT54YT1` |
 | **Name servers (give the parent zone exactly these four)** | `ns-1273.awsdns-31.org`, `ns-1926.awsdns-48.co.uk`, `ns-379.awsdns-47.com`, `ns-827.awsdns-39.net` |
-| Records (parity with DigiCert) | `@ A 37.34.133.35` PRIMARY (**Zain**; set `ebanking-primary`, health check), `@ A 62.215.250.99` SECONDARY (**FastTelco**; set `ebanking-secondary`, health check attached since 2026-10-03, FortiGate; was `91.140.155.171` until 2026-10-03), both TTL 1800 |
+| Records (parity with DigiCert) | `@ A 37.34.133.35` PRIMARY (**Zain**; set `ebanking-primary`, health check), `@ A 62.215.250.99` SECONDARY (**FastTelco**; set `ebanking-secondary`, health check attached since 2026-10-03, FortiGate; was `91.140.155.171` until 2026-10-03), both TTL 60 (was 1800 until 2026-10-03) |
 | Apex NS TTL | 900 s (Route 53 default is 172800) |
 | Health checks | primary `f40f28f3-46f7-4565-86b1-a9fa30f4c302` (TCP 443 on `37.34.133.35`), secondary `0ce5aea4-0529-40f4-bc6e-9a123b89fb61` (TCP 443 on `62.215.250.99`); every 30 s, three failures to mark unhealthy (about 90 s; provisional, DigiCert's "Medium" does not map directly) |
 | Alarms | `amal-dns-ebanking-primary-unhealthy`, `amal-dns-ebanking-secondary-unhealthy`, `amal-dns-ebanking-both-unhealthy`; topic `amal-dns-alerts` has no subscribers by decision, so they notify nobody |
@@ -57,9 +57,9 @@ change the registrar nameservers of `amalbankso.com`, and do not touch any other
 
 ## 4. Operating notes and differences from DigiCert
 
-- **TTL 1800 is preserved for parity.** Clients can keep a stale answer for up to 30 minutes after a failover. To fail over
-  faster, lower `ebanking_ttl` in `terraform.tfvars` (the brief proposes 300 during preparation and 60 as the validated final)
-  and apply; the higher query volume costs cents.
+- **TTL is 60 s** since 2026-10-03 (owner request; it was 1800 for parity). After a failover or failback clients move within about a
+  minute plus the health-check detection time (about 90 s: 30 s interval, three failures). Resolvers still on DigiCert keep DigiCert's
+  1800 until they move to the AWS zone. The higher query volume costs cents. To change it, edit `ebanking_ttl` in `terraform.tfvars`.
 - **Both endpoints failing:** Route 53 answers with the primary, so the name never becomes empty.
 - **Failback is automatic** once the primary's check is healthy again.
 - Failover has **not** been exercised against live endpoints (by design: a live banking endpoint is never disabled to
@@ -99,6 +99,8 @@ observation period ends and you approve.
 - 2026-10-03: owner named the endpoints: primary **Zain** (`37.34.133.35`), secondary **FastTelco** (`62.215.250.99`). Applied as metadata only (5 in-place changes): health-check tags `Name`/`Carrier` (`ebanking-primary-Zain-...`, `ebanking-secondary-FastTelco-...`) and the three alarm descriptions. DNS records, set identifiers, TTLs and health-check settings untouched; both endpoints healthy 16/16; all ebanking alarms OK; no Terraform drift.
 
 - 2026-10-03: failover to the secondary is now **gated on its health check** at the owner's request (`secondary_failover_requires_health_check = true`; one in-place update of the secondary record, attaching the existing health check). After applying: both Zain and FastTelco healthy from 16/16 locations, Route 53 answers `37.34.133.35`, all three ebanking alarms OK, records/TTLs unchanged, no Terraform drift. Behaviour now: primary while healthy; secondary only if the primary is unhealthy and the secondary is healthy; primary if both are unhealthy.
+
+- 2026-10-03: TTL of both failover records lowered from 1800 to **60** at the owner's request (two in-place updates, TTL only). Verified after applying: records show ttl=60 with health checks attached, Zain and FastTelco both healthy 16/16, Route 53 answers `37.34.133.35`, all three alarms OK, apex NS TTL unchanged at 900, no Terraform drift.
 
 ## Completion status (against the migration brief)
 

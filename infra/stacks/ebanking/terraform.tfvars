@@ -8,9 +8,9 @@ ebanking_secondary_ip = "62.215.250.99"
 ebanking_primary_name   = "Zain"
 ebanking_secondary_name = "FastTelco"
 
-# Kept at the observed 1800 for parity. Lower to 300 (cutover preparation) or the validated
-# final value (proposed 60) by editing this and applying; failover then reaches clients faster.
-ebanking_ttl = 1800
+# Lowered from the observed 1800 (kept for parity until 2026-10-03) to 60 at the owner's request, so that a failover or
+# failback reaches clients within about a minute (plus the health-check detection time of about 90 s).
+ebanking_ttl = 60
 
 # Provisional (the DigiCert "Medium" sensitivity does not map directly to Route 53 settings):
 # a check every 30 s, three consecutive failures (about 90 s) to mark an endpoint unhealthy.

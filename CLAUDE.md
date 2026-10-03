@@ -30,7 +30,7 @@ Amal Bank DNS migration to AWS Route 53 (`amalbank.so` and `ebanking.amalbankso.
 | Route 53 zone | `Z02483903EQGQQFHLQUL3` | `Z01112481OCSOFIT54YT1` |
 | Delegation | Registrar -> `ns-1337.awsdns-39.org`, `ns-1683.awsdns-18.co.uk`, `ns-377.awsdns-47.com`, `ns-524.awsdns-01.net` | Child NS at GoDaddy (`amalbankso.com`) -> `ns-1273.awsdns-31.org`, `ns-1926.awsdns-48.co.uk`, `ns-379.awsdns-47.com`, `ns-827.awsdns-39.net` |
 | Status | **Live** (as of 2026-10-02 03:48Z about 6 of 16 Route 53 vantage points on AWS, CloudFront reached from 7 of 16) | **Live** (about 11 of 16 vantage points on AWS) |
-| What it serves | Apex/www -> CloudFront redirect (301 to `https://www.amalbankso.so`, path+query preserved), MX 5 (M365), SPF, autodiscover TXT | Apex A: PRIMARY `37.34.133.35` (**Zain**), SECONDARY `62.215.250.99` (**FastTelco**, FortiGate, since 2026-10-03), TTL 1800 |
+| What it serves | Apex/www -> CloudFront redirect (301 to `https://www.amalbankso.so`, path+query preserved), MX 5 (M365), SPF, autodiscover TXT | Apex A: PRIMARY `37.34.133.35` (**Zain**), SECONDARY `62.215.250.99` (**FastTelco**, FortiGate, since 2026-10-03), TTL **60** (since 2026-10-03) |
 | Runbook | `docs/RUNBOOK_amalbank_so.md` | `docs/RUNBOOK_ebanking.md` |
 
 Applied stacks (all in `infra/stacks/`, separate S3 state in `amal-dns-tfstate-029288159395`): `shared` (alert topic),
@@ -54,8 +54,9 @@ harmless and only completes when the old zones are retired after the observation
   the secondary only while it is healthy, and the primary when both are unhealthy. Both endpoints are healthy from 16/16 locations.
   **The owner must also change DigiCert's failover location 2 to `62.215.250.99`.** Failover/failback have **not** been exercised on
   live endpoints (by design).
-- ebanking TTL is 1800 for parity; consider 300 then 60 after observation. Application-level banking checks need an
-  owner-provided test account. 7-day observation, then the owner decides about retiring No-IP / DigiCert.
+- ebanking TTL was lowered from 1800 to **60** on 2026-10-03 (owner request, applied). Resolvers still on DigiCert keep its 1800 until
+  they move. Application-level banking checks need an owner-provided test account. 7-day observation, then the owner decides about
+  retiring No-IP / DigiCert.
 
 ## Repository layout
 
