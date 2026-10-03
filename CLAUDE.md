@@ -54,13 +54,14 @@ stray leading space, the Lambda strips it) and recipients from secret `SENDGRID_
 comma separated: edit it any time, no deployment; 1 recipient at `amalbankso.so` as of 2026-10-03). The Lambda role can read only those two
 secrets, the logo object, and write its own logs. Logo: private bucket `amal-dns-notify-assets-029288159395`, object `logo.png`, read on every
 email (upload or replace it, no deployment); falls back to a bundled `lambda/logo.png`, then to a plain navy "Amal Bank" text header. The
-logo image sent in chat never reached the sandbox as a file, so the owner (or a file attachment) must provide it. After editing `notify.py`
+logo (360x360 PNG, 14 KB) was loaded into the bucket on 2026-10-03 by a short-lived Lambda that fetched the owner's URL from AWS, because the sandbox's
+proxy blocks that host (the temporary Lambda and role were deleted). The header colour `#042c75` is the logo's own background navy. After editing `notify.py`
 run `python infra/stacks/shared/lambda/build.py`, commit the zip, then apply. Self-test (sends no mail, reports `recipients` and `logo_found`):
 invoke the Lambda with `{"selftest": true}`.
 
 ### Open items
-- **Logo not uploaded yet**: upload the Amal Bank logo PNG to `s3://amal-dns-notify-assets-029288159395/logo.png` (the bucket exists; the Lambda
-  logs `logo_found: false` until then and sends the text header). No email has been sent yet and no real alarm has proven delivery end to end.
+- Notifications: logo is in S3 and recipients are configured (Lambda self-test: SendGrid ok, recipients 1, `logo_found: true`), but **no email
+  has been sent and no real alarm has proven delivery end to end** (a fake alarm email was deliberately not sent).
 - Outbound test mail from an `@amalbank.so` mailbox (inbound passed 2026-10-01).
 - Redirect path/query behaviour vs the legacy No-IP redirect is **assumed** (preserved); No-IP redirected to the `http://`
   address, AWS redirects to `https://` on purpose.

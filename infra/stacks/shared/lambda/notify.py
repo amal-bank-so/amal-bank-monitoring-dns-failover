@@ -32,7 +32,7 @@ import boto3
 SENDGRID = "https://api.sendgrid.com/v3"
 LOGO_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logo.png")  # optional; bundled by build.py when present
 LOGO_CID = "amalbank-logo"
-NAVY = "#0a2260"
+NAVY = "#042c75"  # the logo's own background navy, so the logo blends into the header
 SEVERITY_COLOR = {"CRITICAL": "#b71c1c", "HIGH": "#e65100"}
 _secret_cache = None
 _recipients_cache = None
@@ -135,7 +135,13 @@ def _logo_attachment():
     if not data:
         return None
     import base64
-    return {"content": base64.b64encode(data).decode(), "type": "image/png", "filename": "amal-bank-logo.png",
+    kind, ext = (("image/png", "png") if data[:8] == b"\x89PNG\r\n\x1a\n" else
+                 ("image/jpeg", "jpg") if data[:3] == b"\xff\xd8\xff" else
+                 ("image/gif", "gif") if data[:4] == b"GIF8" else (None, None))
+    if kind is None:
+        print("logo ignored: not a PNG, JPEG or GIF")
+        return None
+    return {"content": base64.b64encode(data).decode(), "type": kind, "filename": "amal-bank-logo." + ext,
             "disposition": "inline", "content_id": LOGO_CID}
 
 
@@ -153,12 +159,12 @@ def render(alarm, severity, title, explanation, has_logo=False):
     table = "<table cellpadding='5' style='font-size:14px'>" + "".join(
         "<tr><td valign='top'><b>%s</b></td><td>%s</td></tr>" % (k, v if k != "Console" else "<a href='%s'>Open in CloudWatch</a>" % v)
         for k, v in rows[1:]) + "</table>"
-    head = ('<img src="cid:%s" alt="Amal Bank" width="110" style="display:block;margin:0 auto">' % LOGO_CID) if has_logo else (
+    head = ('<img src="cid:%s" alt="Amal Bank" width="140" height="140" style="display:block;margin:0 auto">' % LOGO_CID) if has_logo else (
         '<span style="color:#fff;font-size:22px;font-weight:bold;letter-spacing:1px">Amal Bank</span>')
     color = SEVERITY_COLOR[severity]
     html = (
         '<div style="font-family:Arial,Helvetica,sans-serif;max-width:640px;margin:0 auto;border:1px solid #d9dde8">'
-        '<div style="background:%s;padding:16px;text-align:center">%s</div>'
+        '<div style="background:%s;padding:0;text-align:center">%s</div>'
         '<div style="background:%s;color:#fff;padding:10px 16px;font-size:16px;font-weight:bold">%s</div>'
         '<div style="padding:16px">%s</div>'
         '<div style="background:#f3f5fa;color:#667;padding:10px 16px;font-size:12px">Automated DNS monitoring notification '

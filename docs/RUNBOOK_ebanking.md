@@ -106,6 +106,8 @@ observation period ends and you approve.
 
 - 2026-10-03: notifier updated: recipients are read from the Secrets Manager secret `SENDGRID_TO_EMAILS` (eu-west-1; 1 recipient configured), and the email header logo is read from the private S3 bucket `amal-dns-notify-assets-029288159395` (object `logo.png`, **not uploaded yet**, so emails use the text header until it is). Lambda self-test: SendGrid key valid with mail.send, sender configured, recipients 1, logo_found false. No email has been sent. No Terraform drift.
 
+- 2026-10-03: **logo in place.** The owner's logo URL could not be fetched from the sandbox (proxy blocks the host), so a temporary Lambda in the account downloaded it into `s3://amal-dns-notify-assets-029288159395/logo.png` (360x360 PNG, 14 KB, content verified by viewing it) and was deleted with its role (no temporary resources left). Notifier updated: header colour `#042c75` (the logo's own navy), logo shown at 140 px, image type detected (PNG/JPEG/GIF). Self-test: SendGrid ok, recipients 1, logo_found true. No email sent yet. No Terraform drift.
+
 ## Completion status (against the migration brief)
 
 | Requirement | Status |
@@ -117,6 +119,6 @@ observation period ends and you approve.
 | Failover exercised against the live endpoints | **Not done, by design.** Isolated test pair exists but is off |
 | Failback and both-down behaviour demonstrated | **Not demonstrated** (documented Route 53 behaviour only) |
 | Banking TLS and application-level checks (login/read) | **Pending, owner: you** (needs an approved test account; no transactions) |
-| Alert delivery | **Built, recipients configured, self-tested; not yet proven end to end**: no real alarm has fired, and the logo is not uploaded yet |
+| Alert delivery | **Built, recipients configured, self-tested; not yet proven end to end**: no real alarm has fired, the logo is now in place |
 | 7+ stable days of observation | **Pending** (earliest 2026-10-08) |
 | Retire DigiCert | **Not before** the observation period ends and you approve |
