@@ -2,7 +2,7 @@
 # Parity with the DigiCert DNS Made Easy configuration observed in the recording:
 #   A @ 37.34.133.35 (TTL 1800); failover location 2 91.140.155.171; monitor TCP 443.
 ebanking_primary_ip   = "37.34.133.35"
-ebanking_secondary_ip = "91.140.155.171"
+ebanking_secondary_ip = "62.215.250.99"
 
 # Kept at the observed 1800 for parity. Lower to 300 (cutover preparation) or the validated
 # final value (proposed 60) by editing this and applying; failover then reaches clients faster.

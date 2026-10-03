@@ -42,6 +42,14 @@ Propagation note: the share of resolvers on the AWS zone has plateaued (about 6/
 cached the old delegation keep refreshing it from the old provider's servers, which still serve identical data, so this is
 harmless and only completes when the old zones are retired after the observation period. Do not treat the plateau as a failure.
 
+### Pending production change (NOT applied; branch only)
+Owner asked (2026-10-03) to replace the ebanking secondary `91.140.155.171` with the FortiGate `62.215.250.99`. The value is in
+`infra/stacks/ebanking/terraform.tfvars` on the working branch only; the apply (2 in-place changes: secondary health check and
+secondary record) was blocked by the permission checker, so AWS still serves `91.140.155.171`. Until it is applied, **do not push
+this commit to `main`** (rule 1: `main` equals production). After applying: confirm Route 53's checkers reach the new address,
+push to `main`, update the tables here and in `docs/RUNBOOK_ebanking.md`. DigiCert's failover location 2 must also be changed by
+the owner, or resolvers still on DigiCert will fail over to the old address.
+
 ### Open items
 - Outbound test mail from an `@amalbank.so` mailbox (inbound passed 2026-10-01).
 - Redirect path/query behaviour vs the legacy No-IP redirect is **assumed** (preserved); No-IP redirected to the `http://`
