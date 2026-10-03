@@ -69,6 +69,18 @@ variable "enable_ebanking_failover" {
   default     = true
 }
 
+variable "ebanking_primary_name" {
+  description = "Carrier / provider name of the primary endpoint, used only in labels and alarm descriptions (never in record identifiers, which would force the live records to be replaced)."
+  type        = string
+  default     = "Zain"
+}
+
+variable "ebanking_secondary_name" {
+  description = "Carrier / provider name of the secondary endpoint, used only in labels and alarm descriptions."
+  type        = string
+  default     = "FastTelco"
+}
+
 variable "ebanking_primary_ip" {
   description = "Primary endpoint (observed: Failover Location 1)."
   type        = string

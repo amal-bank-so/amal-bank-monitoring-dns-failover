@@ -10,7 +10,7 @@ step that changes what customers' resolvers use.
 |---|---|
 | Hosted zone | `ebanking.amalbankso.com`, ID `Z01112481OCSOFIT54YT1` |
 | **Name servers (give the parent zone exactly these four)** | `ns-1273.awsdns-31.org`, `ns-1926.awsdns-48.co.uk`, `ns-379.awsdns-47.com`, `ns-827.awsdns-39.net` |
-| Records (parity with DigiCert) | `@ A 37.34.133.35` PRIMARY (set `ebanking-primary`, health check), `@ A 62.215.250.99` SECONDARY (set `ebanking-secondary`, FortiGate; was `91.140.155.171` until 2026-10-03), both TTL 1800 |
+| Records (parity with DigiCert) | `@ A 37.34.133.35` PRIMARY (**Zain**; set `ebanking-primary`, health check), `@ A 62.215.250.99` SECONDARY (**FastTelco**; set `ebanking-secondary`, FortiGate; was `91.140.155.171` until 2026-10-03), both TTL 1800 |
 | Apex NS TTL | 900 s (Route 53 default is 172800) |
 | Health checks | primary `f40f28f3-46f7-4565-86b1-a9fa30f4c302` (TCP 443 on `37.34.133.35`), secondary `0ce5aea4-0529-40f4-bc6e-9a123b89fb61` (TCP 443 on `62.215.250.99`); every 30 s, three failures to mark unhealthy (about 90 s; provisional, DigiCert's "Medium" does not map directly) |
 | Alarms | `amal-dns-ebanking-primary-unhealthy`, `amal-dns-ebanking-secondary-unhealthy`, `amal-dns-ebanking-both-unhealthy`; topic `amal-dns-alerts` has no subscribers by decision, so they notify nobody |
@@ -95,6 +95,8 @@ observation period ends and you approve.
 - 2026-10-02 05:06Z: re-check. 3343 queries since go-live; last hour 437 from 367 resolvers (434 NOERROR, 3 NXDOMAIN, all `www.ebanking`, which never existed at DigiCert). Primary 16/16 healthy, secondary still blocked by its firewall (alarm in ALARM as documented), Route 53 answers 37.34.133.35, no Terraform drift.
 
 - 2026-10-03: secondary endpoint changed from `91.140.155.171` (dead from Route 53's view) to the FortiGate `62.215.250.99` at the owner's request and approval. Plan reviewed (exactly two in-place updates), applied, then Route 53 health checkers: primary 16/16 connected, **secondary 16/16 connected**. Route 53 still answers `37.34.133.35` (primary healthy). The secondary alarm cleared to OK at 17:23Z once the metric recovered (healthy from 17:22Z); all ebanking alarms are OK. DigiCert not changed by this migration; owner to update its failover location 2.
+
+- 2026-10-03: owner named the endpoints: primary **Zain** (`37.34.133.35`), secondary **FastTelco** (`62.215.250.99`). Applied as metadata only (5 in-place changes): health-check tags `Name`/`Carrier` (`ebanking-primary-Zain-...`, `ebanking-secondary-FastTelco-...`) and the three alarm descriptions. DNS records, set identifiers, TTLs and health-check settings untouched; both endpoints healthy 16/16; all ebanking alarms OK; no Terraform drift.
 
 ## Completion status (against the migration brief)
 

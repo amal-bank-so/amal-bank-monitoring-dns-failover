@@ -30,7 +30,7 @@ Amal Bank DNS migration to AWS Route 53 (`amalbank.so` and `ebanking.amalbankso.
 | Route 53 zone | `Z02483903EQGQQFHLQUL3` | `Z01112481OCSOFIT54YT1` |
 | Delegation | Registrar -> `ns-1337.awsdns-39.org`, `ns-1683.awsdns-18.co.uk`, `ns-377.awsdns-47.com`, `ns-524.awsdns-01.net` | Child NS at GoDaddy (`amalbankso.com`) -> `ns-1273.awsdns-31.org`, `ns-1926.awsdns-48.co.uk`, `ns-379.awsdns-47.com`, `ns-827.awsdns-39.net` |
 | Status | **Live** (as of 2026-10-02 03:48Z about 6 of 16 Route 53 vantage points on AWS, CloudFront reached from 7 of 16) | **Live** (about 11 of 16 vantage points on AWS) |
-| What it serves | Apex/www -> CloudFront redirect (301 to `https://www.amalbankso.so`, path+query preserved), MX 5 (M365), SPF, autodiscover TXT | Apex A: PRIMARY `37.34.133.35`, SECONDARY `62.215.250.99` (FortiGate, since 2026-10-03), TTL 1800 |
+| What it serves | Apex/www -> CloudFront redirect (301 to `https://www.amalbankso.so`, path+query preserved), MX 5 (M365), SPF, autodiscover TXT | Apex A: PRIMARY `37.34.133.35` (**Zain**), SECONDARY `62.215.250.99` (**FastTelco**, FortiGate, since 2026-10-03), TTL 1800 |
 | Runbook | `docs/RUNBOOK_amalbank_so.md` | `docs/RUNBOOK_ebanking.md` |
 
 Applied stacks (all in `infra/stacks/`, separate S3 state in `amal-dns-tfstate-029288159395`): `shared` (alert topic),
@@ -46,6 +46,9 @@ harmless and only completes when the old zones are retired after the observation
 - Outbound test mail from an `@amalbank.so` mailbox (inbound passed 2026-10-01).
 - Redirect path/query behaviour vs the legacy No-IP redirect is **assumed** (preserved); No-IP redirected to the `http://`
   address, AWS redirects to `https://` on purpose.
+- ebanking carriers: primary = Zain (`37.34.133.35`), secondary = FastTelco (`62.215.250.99`). The names are in the health-check `Name`/`Carrier`
+  tags and alarm descriptions (variables `ebanking_primary_name`/`ebanking_secondary_name`), never in record `set_identifier`s: changing those
+  would replace the live banking records.
 - ebanking secondary: changed on 2026-10-03 from `91.140.155.171` to the FortiGate `62.215.250.99` (applied; Route 53 checkers
   reach it 16/16). The secondary record is still **not gated** by its health check
   (`secondary_failover_requires_health_check = false`); setting it to `true` is now possible and matches the original design.

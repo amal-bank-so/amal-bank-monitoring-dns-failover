@@ -20,7 +20,7 @@ resource "aws_cloudwatch_metric_alarm" "ebanking_health" {
   for_each = local.alarms_enabled ? local.health_checks : {}
 
   alarm_name          = "${var.name_prefix}-ebanking-${each.key}-unhealthy"
-  alarm_description   = "Route 53 health check for the ebanking ${each.key} endpoint is unhealthy (TCP ${var.health_check_port})."
+  alarm_description   = "Route 53 health check for the ebanking ${each.key} endpoint (${each.key == "primary" ? "${var.ebanking_primary_name} ${var.ebanking_primary_ip}" : "${var.ebanking_secondary_name} ${var.ebanking_secondary_ip}"}) is unhealthy (TCP ${var.health_check_port})."
   namespace           = "AWS/Route53"
   metric_name         = "HealthCheckStatus"
   dimensions          = { HealthCheckId = each.value }
@@ -40,7 +40,7 @@ resource "aws_cloudwatch_composite_alarm" "ebanking_both_down" {
   count = local.alarms_enabled ? 1 : 0
 
   alarm_name        = "${var.name_prefix}-ebanking-both-unhealthy"
-  alarm_description = "Both ebanking endpoints are failing Route 53 health checks. Route 53 will answer with the primary."
+  alarm_description = "Both ebanking endpoints (${var.ebanking_primary_name} and ${var.ebanking_secondary_name}) are failing Route 53 health checks. Route 53 will answer with the primary (${var.ebanking_primary_name})."
   alarm_rule        = "ALARM(${aws_cloudwatch_metric_alarm.ebanking_health["primary"].alarm_name}) AND ALARM(${aws_cloudwatch_metric_alarm.ebanking_health["secondary"].alarm_name})"
 
   alarm_actions = [data.aws_sns_topic.alerts[0].arn]

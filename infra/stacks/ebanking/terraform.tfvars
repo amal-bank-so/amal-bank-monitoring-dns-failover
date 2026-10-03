@@ -4,6 +4,10 @@
 ebanking_primary_ip   = "37.34.133.35"
 ebanking_secondary_ip = "62.215.250.99"
 
+# Carrier names, for labels and alarm descriptions only.
+ebanking_primary_name   = "Zain"
+ebanking_secondary_name = "FastTelco"
+
 # Kept at the observed 1800 for parity. Lower to 300 (cutover preparation) or the validated
 # final value (proposed 60) by editing this and applying; failover then reaches clients faster.
 ebanking_ttl = 1800

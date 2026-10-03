@@ -19,8 +19,9 @@ resource "aws_route53_health_check" "ebanking_primary" {
   measure_latency   = false
 
   tags = {
-    Name = "ebanking-primary-${var.ebanking_primary_ip}-tcp${var.health_check_port}"
-    Role = "primary"
+    Name    = "ebanking-primary-${var.ebanking_primary_name}-${var.ebanking_primary_ip}-tcp${var.health_check_port}"
+    Role    = "primary"
+    Carrier = var.ebanking_primary_name
   }
 }
 
@@ -35,8 +36,9 @@ resource "aws_route53_health_check" "ebanking_secondary" {
   measure_latency   = false
 
   tags = {
-    Name = "ebanking-secondary-${var.ebanking_secondary_ip}-tcp${var.health_check_port}"
-    Role = "secondary"
+    Name    = "ebanking-secondary-${var.ebanking_secondary_name}-${var.ebanking_secondary_ip}-tcp${var.health_check_port}"
+    Role    = "secondary"
+    Carrier = var.ebanking_secondary_name
   }
 }
 
