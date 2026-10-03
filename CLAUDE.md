@@ -13,7 +13,7 @@ Amal Bank DNS migration to AWS Route 53 (`amalbank.so` and `ebanking.amalbankso.
    curl output unless they ask. Still review the plan before applying, check the result after applying, and never claim
    something works without evidence.
 3. **Notifications go out through SendGrid, not SNS email subscriptions** (owner decision 2026-10-03, replacing the earlier "no
-   subscriptions" rule). Do not subscribe email addresses to the SNS topic. Exactly three e-banking emails exist (below); do not add
+   subscriptions" rule). Do not subscribe email addresses to the SNS topic. Exactly four e-banking emails exist (below); do not add
    more without the owner asking. Never print the SendGrid key.
 4. **No pull requests** unless asked.
 5. **Old providers are the rollback.** Never change, cancel or retire No-IP (`amalbank.so`) or DigiCert DNS Made Easy
@@ -45,10 +45,10 @@ harmless and only completes when the old zones are retired after the observation
 
 ### Notifications (deployed 2026-10-03, `shared` stack)
 Every alarm publishes to SNS topic `amal-dns-alerts`; Lambda `amal-dns-notify` (subscribed, `infra/stacks/shared/lambda/notify.py`) emails
-through SendGrid and sends **only** these three: **HIGH - Failover from Primary (Zain) to Secondary (FastTelco)** (alarm
+through SendGrid and sends **only** these four: **HIGH - Failover from Primary (Zain) to Secondary (FastTelco)** (alarm
 `amal-dns-ebanking-failover` -> ALARM: primary unhealthy and secondary healthy), **HIGH - Primary (Zain) is Back**
-(`amal-dns-ebanking-primary-unhealthy` -> OK), **CRITICAL - E-Banking is Down** (`amal-dns-ebanking-both-unhealthy` -> ALARM). All other
-alarms (amalbank.so, secondary-unhealthy, ...) stay in the CloudWatch console and send nothing. The SendGrid key and sender are read at run
+(`amal-dns-ebanking-primary-unhealthy` -> OK), **HIGH - Secondary (FastTelco) is Down** (`amal-dns-ebanking-secondary-unhealthy` -> ALARM), **CRITICAL - E-Banking is Down** (`amal-dns-ebanking-both-unhealthy` -> ALARM). All other
+alarms (amalbank.so, ...) stay in the CloudWatch console and send nothing. The SendGrid key and sender are read at run
 time from Secrets Manager secret `SendGrid_API` in **eu-west-1** (fields `SENDGRID_API_KEY`, `SENDGRID_FROM_EMAIL`; the field name has a
 stray leading space, the Lambda strips it) and recipients from secret `SENDGRID_TO_EMAILS` (also eu-west-1, JSON field `SENDGRID_TO_EMAILS`,
 comma separated: edit it any time, no deployment; 1 recipient at `amalbankso.so` as of 2026-10-03). The Lambda role can read only those two
@@ -57,11 +57,10 @@ email (upload or replace it, no deployment); falls back to a bundled `lambda/log
 logo (360x360 PNG, 14 KB) was loaded into the bucket on 2026-10-03 by a short-lived Lambda that fetched the owner's URL from AWS, because the sandbox's
 proxy blocks that host (the temporary Lambda and role were deleted). The header colour `#042c75` is the logo's own background navy. After editing `notify.py`
 run `python infra/stacks/shared/lambda/build.py`, commit the zip, then apply. Self-test (sends no mail, reports `recipients` and `logo_found`):
-invoke the Lambda with `{"selftest": true}`.
+invoke the Lambda with `{"selftest": true}`. `{"send_test": true}` sends one clearly marked `[TEST]` email per notification (4) through the real path without touching alarms; use it only when the owner asks.
 
 ### Open items
-- Notifications: logo is in S3 and recipients are configured (Lambda self-test: SendGrid ok, recipients 1, `logo_found: true`), but **no email
-  has been sent and no real alarm has proven delivery end to end** (a fake alarm email was deliberately not sent).
+- Notifications: logo is in S3 and recipients are configured (Lambda self-test: SendGrid ok, recipients 1, `logo_found: true`), and on 2026-10-03 the owner asked for test emails: 4 `[TEST]` emails were accepted by SendGrid (HTTP 202). Inbox arrival is for the owner to confirm; no *real* alarm has fired yet, so the alarm-to-email path is proven only by the test path plus local checks.
 - Outbound test mail from an `@amalbank.so` mailbox (inbound passed 2026-10-01).
 - Redirect path/query behaviour vs the legacy No-IP redirect is **assumed** (preserved); No-IP redirected to the `http://`
   address, AWS redirects to `https://` on purpose.

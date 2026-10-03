@@ -1,11 +1,12 @@
-"""Email the three e-banking notifications through SendGrid.
+"""Email the four e-banking notifications through SendGrid.
 
-Subscribed to the SNS topic that every CloudWatch alarm publishes to. Only these three alarm events send an email; every
+Subscribed to the SNS topic that every CloudWatch alarm publishes to. Only these four alarm events send an email; every
 other alarm message is ignored (the alarms stay visible in the CloudWatch console):
 
-    HIGH      Failover from Primary to Secondary   alarm <prefix>-ebanking-failover          -> ALARM
-    HIGH      Primary is Back                      alarm <prefix>-ebanking-primary-unhealthy -> OK
-    CRITICAL  E-Banking is Down                    alarm <prefix>-ebanking-both-unhealthy    -> ALARM
+    HIGH      Failover from Primary to Secondary   alarm <prefix>-ebanking-failover            -> ALARM
+    HIGH      Primary is Back                      alarm <prefix>-ebanking-primary-unhealthy   -> OK
+    HIGH      Secondary is Down                    alarm <prefix>-ebanking-secondary-unhealthy -> ALARM
+    CRITICAL  E-Banking is Down                    alarm <prefix>-ebanking-both-unhealthy      -> ALARM
 
 The SendGrid API key and the sender address are read from AWS Secrets Manager at run time (never from the environment or the
 repository):
@@ -18,6 +19,9 @@ comma separated string), so recipients can be added without a deployment. Each r
 are not exposed to each other. A failed send raises, so SNS retries the delivery. The Amal Bank logo is embedded in the email header from, in order: the S3 object
 ASSET_BUCKET/LOGO_KEY (upload or replace it any time, no deployment needed), a logo.png bundled next to this file, or a plain
 text header if neither exists.
+
+A direct invocation with {"send_test": true} sends one clearly marked TEST email per notification through the real rendering and
+SendGrid path, without touching any alarm or endpoint.
 
 A direct invocation with {"selftest": true} checks the secret, the key and the outbound path (GET /v3/scopes) without sending
 any email.
@@ -50,6 +54,11 @@ def classify(alarm_name, state):
     if alarm_name.endswith("-ebanking-primary-unhealthy") and state == "OK":
         return ("HIGH", "%s is Back" % primary,
                 "The primary endpoint is passing its health check again. Route 53 answers with the primary again.")
+    if alarm_name.endswith("-ebanking-secondary-unhealthy") and state == "ALARM":
+        return ("HIGH", "%s is Down" % secondary,
+                "The secondary endpoint is failing its health check, so there is currently no healthy failover target. If the "
+                "primary is healthy, e-banking is not affected. If the primary also fails you will receive the CRITICAL "
+                "E-Banking is Down notification.")
     if alarm_name.endswith("-ebanking-both-unhealthy") and state == "ALARM":
         return ("CRITICAL", "E-Banking is Down",
                 "Both the primary and the secondary endpoints are failing their health checks. Route 53 keeps answering with "
@@ -145,7 +154,7 @@ def _logo_attachment():
             "disposition": "inline", "content_id": LOGO_CID}
 
 
-def render(alarm, severity, title, explanation, has_logo=False):
+def render(alarm, severity, title, explanation, has_logo=False, test=False):
     """-> (subject, text, html) for one notification. alarm is the CloudWatch alarm JSON from the SNS message."""
     name = alarm["AlarmName"]
     link = "https://console.aws.amazon.com/cloudwatch/home?region=%s#alarmsV2:alarm/%s" % (
@@ -155,22 +164,60 @@ def render(alarm, severity, title, explanation, has_logo=False):
         ("Alarm", name), ("Detail", alarm.get("AlarmDescription") or "-"), ("Reason", alarm.get("NewStateReason") or "-"),
         ("Time", alarm.get("StateChangeTime") or "-"), ("Account", alarm.get("AWSAccountId") or "-"), ("Console", link),
     ]
+    if test:
+        rows.insert(1, ("TEST", "This is a TEST message. No real alarm fired and nothing is wrong."))
     text = "\n".join("%s: %s" % r for r in rows)
+    banner = ('<div style="background:#455a64;color:#fff;padding:8px 16px;font-size:13px;font-weight:bold">TEST MESSAGE - no real '
+              'alarm fired, nothing is wrong</div>') if test else ""
     table = "<table cellpadding='5' style='font-size:14px'>" + "".join(
         "<tr><td valign='top'><b>%s</b></td><td>%s</td></tr>" % (k, v if k != "Console" else "<a href='%s'>Open in CloudWatch</a>" % v)
-        for k, v in rows[1:]) + "</table>"
+        for k, v in rows[1:] if k != "TEST") + "</table>"
     head = ('<img src="cid:%s" alt="Amal Bank" width="140" height="140" style="display:block;margin:0 auto">' % LOGO_CID) if has_logo else (
         '<span style="color:#fff;font-size:22px;font-weight:bold;letter-spacing:1px">Amal Bank</span>')
     color = SEVERITY_COLOR[severity]
     html = (
         '<div style="font-family:Arial,Helvetica,sans-serif;max-width:640px;margin:0 auto;border:1px solid #d9dde8">'
         '<div style="background:%s;padding:0;text-align:center">%s</div>'
-        '<div style="background:%s;color:#fff;padding:10px 16px;font-size:16px;font-weight:bold">%s</div>'
+        '%s<div style="background:%s;color:#fff;padding:10px 16px;font-size:16px;font-weight:bold">%s</div>'
         '<div style="padding:16px">%s</div>'
         '<div style="background:#f3f5fa;color:#667;padding:10px 16px;font-size:12px">Automated DNS monitoring notification '
         '(ebanking.amalbankso.com on AWS Route 53). Do not reply.</div></div>'
-    ) % (NAVY, head, color, "%s - %s" % (severity, title), table)
-    return "%s - %s" % (severity, title), text, html
+    ) % (NAVY, head, banner, color, "%s - %s" % (severity, title), table)
+    return ("[TEST] " if test else "") + "%s - %s" % (severity, title), text, html
+
+
+TEST_CASES = [  # (alarm name suffix, state, description) for the TEST emails: the same four events the real alarms produce
+    ("ebanking-failover", "ALARM", "TEST: primary unhealthy and secondary healthy (simulated)"),
+    ("ebanking-primary-unhealthy", "OK", "TEST: primary healthy again (simulated)"),
+    ("ebanking-secondary-unhealthy", "ALARM", "TEST: secondary unhealthy (simulated)"),
+    ("ebanking-both-unhealthy", "ALARM", "TEST: both endpoints unhealthy (simulated)"),
+]
+
+
+def _send_test(key, sender, to, logo):
+    import datetime
+    if not to:
+        return {"sent": 0, "error": "no recipients configured"}
+    prefix = os.environ.get("TEST_ALARM_PREFIX", "amal-dns")
+    now = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    sent = []
+    for suffix, state, desc in TEST_CASES:
+        alarm = {"AlarmName": "%s-%s" % (prefix, suffix), "NewStateValue": state, "AlarmDescription": desc,
+                 "NewStateReason": "TEST: simulated, no real alarm", "StateChangeTime": now, "AWSAccountId": "-"}
+        kind = classify(alarm["AlarmName"], state)
+        subject, text, html = render(alarm, *kind, has_logo=bool(logo), test=True)
+        payload = {
+            "personalizations": [{"to": [{"email": a}]} for a in to], "from": {"email": sender},
+            "subject": os.environ.get("SUBJECT_PREFIX", "") + subject,
+            "content": [{"type": "text/plain", "value": text}, {"type": "text/html", "value": html}],
+        }
+        if logo:
+            payload["attachments"] = [logo]
+        status, body = _request("POST", "/mail/send", key, payload)
+        if status not in (200, 201, 202):
+            raise RuntimeError("SendGrid rejected the test message: HTTP %s %s" % (status, body))
+        sent.append({"subject": os.environ.get("SUBJECT_PREFIX", "") + subject, "sendgrid_status": status})
+    return {"sent": len(sent), "recipients": len(to), "messages": sent}
 
 
 def handler(event, context):
@@ -186,6 +233,8 @@ def handler(event, context):
     sender = secret["SENDGRID_FROM_EMAIL"]
     to = _recipients(secret)
     logo = _logo_attachment()
+    if isinstance(event, dict) and event.get("send_test"):
+        return _send_test(key, sender, to, logo)
     sent = ignored = 0
     for record in event.get("Records", []):
         try:
