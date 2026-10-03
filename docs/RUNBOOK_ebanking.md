@@ -102,6 +102,8 @@ observation period ends and you approve.
 
 - 2026-10-03: TTL of both failover records lowered from 1800 to **60** at the owner's request (two in-place updates, TTL only). Verified after applying: records show ttl=60 with health checks attached, Zain and FastTelco both healthy 16/16, Route 53 answers `37.34.133.35`, all three alarms OK, apex NS TTL unchanged at 900, no Terraform drift.
 
+- 2026-10-03: **email notifications deployed** (SendGrid via Lambda `amal-dns-notify`, key read from Secrets Manager `SendGrid_API` in eu-west-1). Exactly three e-banking emails: HIGH Failover from Primary (Zain) to Secondary (FastTelco) (new composite alarm `amal-dns-ebanking-failover`: primary unhealthy AND secondary healthy), HIGH Primary (Zain) is Back (`primary-unhealthy` alarm -> OK), CRITICAL E-Banking is Down (`both-unhealthy` -> ALARM). Lambda self-test from inside AWS: SendGrid key valid with mail.send permission, sender configured. **No recipients configured yet, so nothing is sent**; add them in `stacks/shared/terraform.tfvars` (`notification_recipients`) or the secret's `SENDGRID_TO_EMAILS`. Logo pending (`lambda/logo.png`). All four ebanking alarms OK, no Terraform drift.
+
 ## Completion status (against the migration brief)
 
 | Requirement | Status |
@@ -113,6 +115,6 @@ observation period ends and you approve.
 | Failover exercised against the live endpoints | **Not done, by design.** Isolated test pair exists but is off |
 | Failback and both-down behaviour demonstrated | **Not demonstrated** (documented Route 53 behaviour only) |
 | Banking TLS and application-level checks (login/read) | **Pending, owner: you** (needs an approved test account; no transactions) |
-| Alert delivery | **Not performed**: no subscribers, by decision |
+| Alert delivery | **Built and self-tested; not yet sending**: needs recipients (and the logo file); no real alarm has been triggered to prove delivery end to end |
 | 7+ stable days of observation | **Pending** (earliest 2026-10-08) |
 | Retire DigiCert | **Not before** the observation period ends and you approve |

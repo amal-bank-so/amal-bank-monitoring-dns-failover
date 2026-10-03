@@ -31,6 +31,8 @@ jobs:
           python -W error::ResourceWarning -m unittest discover -s infra/tools
       - name: Format check
         run: terraform fmt -check -recursive infra
+      - name: Notify Lambda zip is up to date
+        run: python infra/stacks/shared/lambda/build.py --check
       - name: Terraform tests (offline, mock provider)
         run: |
           cd infra/stacks/amalbank-so

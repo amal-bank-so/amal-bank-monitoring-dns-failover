@@ -12,8 +12,9 @@ Amal Bank DNS migration to AWS Route 53 (`amalbank.so` and `ebanking.amalbankso.
    extra test tooling, test infrastructure or test rounds, and do not ask the owner for test inputs, test mailboxes or
    curl output unless they ask. Still review the plan before applying, check the result after applying, and never claim
    something works without evidence.
-3. **No SNS subscriptions.** The alert topic `amal-dns-alerts` exists with no subscribers by decision. Do not ask for
-   recipients or subscribe anyone. Alarms exist and are visible in the CloudWatch console.
+3. **Notifications go out through SendGrid, not SNS email subscriptions** (owner decision 2026-10-03, replacing the earlier "no
+   subscriptions" rule). Do not subscribe email addresses to the SNS topic. Exactly three e-banking emails exist (below); do not add
+   more without the owner asking. Never print the SendGrid key.
 4. **No pull requests** unless asked.
 5. **Old providers are the rollback.** Never change, cancel or retire No-IP (`amalbank.so`) or DigiCert DNS Made Easy
    (`ebanking`). Retire only after the 7-day observation period (earliest 2026-10-08) and explicit owner approval.
@@ -42,7 +43,21 @@ Propagation note: the share of resolvers on the AWS zone has plateaued (about 6/
 cached the old delegation keep refreshing it from the old provider's servers, which still serve identical data, so this is
 harmless and only completes when the old zones are retired after the observation period. Do not treat the plateau as a failure.
 
+### Notifications (deployed 2026-10-03, `shared` stack)
+Every alarm publishes to SNS topic `amal-dns-alerts`; Lambda `amal-dns-notify` (subscribed, `infra/stacks/shared/lambda/notify.py`) emails
+through SendGrid and sends **only** these three: **HIGH - Failover from Primary (Zain) to Secondary (FastTelco)** (alarm
+`amal-dns-ebanking-failover` -> ALARM: primary unhealthy and secondary healthy), **HIGH - Primary (Zain) is Back**
+(`amal-dns-ebanking-primary-unhealthy` -> OK), **CRITICAL - E-Banking is Down** (`amal-dns-ebanking-both-unhealthy` -> ALARM). All other
+alarms (amalbank.so, secondary-unhealthy, ...) stay in the CloudWatch console and send nothing. The SendGrid key and sender are read at run
+time from Secrets Manager secret `SendGrid_API` in **eu-west-1** (fields `SENDGRID_API_KEY`, `SENDGRID_FROM_EMAIL`; the field name has a
+stray leading space, the Lambda strips it); the Lambda role can read only that secret. Recipients: Terraform `notification_recipients`
+(`stacks/shared/terraform.tfvars`) and/or an optional `SENDGRID_TO_EMAILS` field in the secret (comma separated, no deployment). Rebuild the
+zip with `python infra/stacks/shared/lambda/build.py` after editing `notify.py` or adding `lambda/logo.png` (the Amal Bank logo, embedded in
+the email header when present), commit the zip, then apply. Self-test without sending mail: invoke the Lambda with `{"selftest": true}`.
+
 ### Open items
+- **Notification recipients are not set yet**, so no email is sent until addresses are added (see above). **`lambda/logo.png` is not in the repo
+  yet**: the owner's logo image was only shown in chat; save it as `infra/stacks/shared/lambda/logo.png`, rebuild the zip and apply.
 - Outbound test mail from an `@amalbank.so` mailbox (inbound passed 2026-10-01).
 - Redirect path/query behaviour vs the legacy No-IP redirect is **assumed** (preserved); No-IP redirected to the `http://`
   address, AWS redirects to `https://` on purpose.
@@ -62,7 +77,7 @@ harmless and only completes when the old zones are retired after the observation
 
 ```
 infra/bootstrap/        state bucket (applied once)
-infra/stacks/shared|amalbank-so|ebanking/   Terraform root modules, one state each; apply order shared -> others
+infra/stacks/shared|amalbank-so|ebanking/   Terraform root modules, one state each; apply order shared -> others (shared also holds the notify Lambda)
 infra/tools/            bind_to_inventory.py, failover_test.py, verify_zone.py, check_web.sh, redirect function tests, aws-env.sh
 infra/evidence/         verification output
 docs/                   MIGRATION_PLAN.md, RUNBOOK_amalbank_so.md, RUNBOOK_ebanking.md

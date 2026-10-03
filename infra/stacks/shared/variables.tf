@@ -42,3 +42,45 @@ variable "alert_emails" {
     error_message = "alert_emails must be valid email addresses."
   }
 }
+
+# --- notifications (SendGrid) --------------------------------------------------
+
+variable "notification_recipients" {
+  description = "Email addresses that receive every alarm notification, sent through SendGrid by the notify Lambda. More can be added without a deployment through the optional SENDGRID_TO_EMAILS field (comma separated) of the secret."
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition     = alltrue([for e in var.notification_recipients : can(regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", e))])
+    error_message = "notification_recipients must be valid email addresses."
+  }
+}
+
+variable "sendgrid_secret_arn" {
+  description = "ARN of the AWS Secrets Manager secret holding SENDGRID_API_KEY and SENDGRID_FROM_EMAIL (it may live in another region). The notify Lambda's role can read only this secret."
+  type        = string
+}
+
+variable "ebanking_primary_label" {
+  description = "How the primary e-banking endpoint is named in notification emails."
+  type        = string
+  default     = "Primary (Zain)"
+}
+
+variable "ebanking_secondary_label" {
+  description = "How the secondary e-banking endpoint is named in notification emails."
+  type        = string
+  default     = "Secondary (FastTelco)"
+}
+
+variable "notification_subject_prefix" {
+  description = "Prefix of every notification email subject."
+  type        = string
+  default     = "[Amal DNS] "
+}
+
+variable "notification_log_retention_days" {
+  description = "Retention of the notify Lambda's logs."
+  type        = number
+  default     = 365
+}
