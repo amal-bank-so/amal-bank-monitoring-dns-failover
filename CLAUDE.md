@@ -30,7 +30,7 @@ Amal Bank DNS migration to AWS Route 53 (`amalbank.so` and `ebanking.amalbankso.
 | Route 53 zone | `Z02483903EQGQQFHLQUL3` | `Z01112481OCSOFIT54YT1` |
 | Delegation | Registrar -> `ns-1337.awsdns-39.org`, `ns-1683.awsdns-18.co.uk`, `ns-377.awsdns-47.com`, `ns-524.awsdns-01.net` | Child NS at GoDaddy (`amalbankso.com`) -> `ns-1273.awsdns-31.org`, `ns-1926.awsdns-48.co.uk`, `ns-379.awsdns-47.com`, `ns-827.awsdns-39.net` |
 | Status | **Live** (as of 2026-10-02 03:48Z about 6 of 16 Route 53 vantage points on AWS, CloudFront reached from 7 of 16) | **Live** (about 11 of 16 vantage points on AWS) |
-| What it serves | Apex/www -> CloudFront redirect (301 to `https://www.amalbankso.so`, path+query preserved), MX 5 (M365), SPF, autodiscover TXT | Apex A: PRIMARY `37.34.133.35`, SECONDARY `91.140.155.171`, TTL 1800 |
+| What it serves | Apex/www -> CloudFront redirect (301 to `https://www.amalbankso.so`, path+query preserved), MX 5 (M365), SPF, autodiscover TXT | Apex A: PRIMARY `37.34.133.35`, SECONDARY `62.215.250.99` (FortiGate, since 2026-10-03), TTL 1800 |
 | Runbook | `docs/RUNBOOK_amalbank_so.md` | `docs/RUNBOOK_ebanking.md` |
 
 Applied stacks (all in `infra/stacks/`, separate S3 state in `amal-dns-tfstate-029288159395`): `shared` (alert topic),
@@ -42,22 +42,15 @@ Propagation note: the share of resolvers on the AWS zone has plateaued (about 6/
 cached the old delegation keep refreshing it from the old provider's servers, which still serve identical data, so this is
 harmless and only completes when the old zones are retired after the observation period. Do not treat the plateau as a failure.
 
-### Pending production change (NOT applied; branch only)
-Owner asked (2026-10-03) to replace the ebanking secondary `91.140.155.171` with the FortiGate `62.215.250.99`. The value is in
-`infra/stacks/ebanking/terraform.tfvars` on the working branch only; the apply (2 in-place changes: secondary health check and
-secondary record) was blocked by the permission checker, so AWS still serves `91.140.155.171`. Until it is applied, **do not push
-this commit to `main`** (rule 1: `main` equals production). After applying: confirm Route 53's checkers reach the new address,
-push to `main`, update the tables here and in `docs/RUNBOOK_ebanking.md`. DigiCert's failover location 2 must also be changed by
-the owner, or resolvers still on DigiCert will fail over to the old address.
-
 ### Open items
 - Outbound test mail from an `@amalbank.so` mailbox (inbound passed 2026-10-01).
 - Redirect path/query behaviour vs the legacy No-IP redirect is **assumed** (preserved); No-IP redirected to the `http://`
   address, AWS redirects to `https://` on purpose.
-- ebanking: the secondary endpoint's firewall blocks Route 53 health checkers (16/16 time out), so the secondary record is
-  **not gated** by its health check (`secondary_failover_requires_health_check = false`). Allow the `ROUTE53_HEALTHCHECKS`
-  ranges (<https://ip-ranges.amazonaws.com/ip-ranges.json>) on `91.140.155.171:443`, wait for the secondary alarm to be OK,
-  then set it to `true`. Failover/failback have **not** been exercised on live endpoints (by design).
+- ebanking secondary: changed on 2026-10-03 from `91.140.155.171` to the FortiGate `62.215.250.99` (applied; Route 53 checkers
+  reach it 16/16). The secondary record is still **not gated** by its health check
+  (`secondary_failover_requires_health_check = false`); setting it to `true` is now possible and matches the original design.
+  **The owner must also change DigiCert's failover location 2 to `62.215.250.99`.** Failover/failback have **not** been exercised
+  on live endpoints (by design).
 - ebanking TTL is 1800 for parity; consider 300 then 60 after observation. Application-level banking checks need an
   owner-provided test account. 7-day observation, then the owner decides about retiring No-IP / DigiCert.
 

@@ -10,9 +10,9 @@ step that changes what customers' resolvers use.
 |---|---|
 | Hosted zone | `ebanking.amalbankso.com`, ID `Z01112481OCSOFIT54YT1` |
 | **Name servers (give the parent zone exactly these four)** | `ns-1273.awsdns-31.org`, `ns-1926.awsdns-48.co.uk`, `ns-379.awsdns-47.com`, `ns-827.awsdns-39.net` |
-| Records (parity with DigiCert) | `@ A 37.34.133.35` PRIMARY (set `ebanking-primary`, health check), `@ A 91.140.155.171` SECONDARY (set `ebanking-secondary`), both TTL 1800 |
+| Records (parity with DigiCert) | `@ A 37.34.133.35` PRIMARY (set `ebanking-primary`, health check), `@ A 62.215.250.99` SECONDARY (set `ebanking-secondary`, FortiGate; was `91.140.155.171` until 2026-10-03), both TTL 1800 |
 | Apex NS TTL | 900 s (Route 53 default is 172800) |
-| Health checks | primary `f40f28f3-46f7-4565-86b1-a9fa30f4c302` (TCP 443 on `37.34.133.35`), secondary `0ce5aea4-0529-40f4-bc6e-9a123b89fb61` (TCP 443 on `91.140.155.171`); every 30 s, three failures to mark unhealthy (about 90 s; provisional, DigiCert's "Medium" does not map directly) |
+| Health checks | primary `f40f28f3-46f7-4565-86b1-a9fa30f4c302` (TCP 443 on `37.34.133.35`), secondary `0ce5aea4-0529-40f4-bc6e-9a123b89fb61` (TCP 443 on `62.215.250.99`); every 30 s, three failures to mark unhealthy (about 90 s; provisional, DigiCert's "Medium" does not map directly) |
 | Alarms | `amal-dns-ebanking-primary-unhealthy`, `amal-dns-ebanking-secondary-unhealthy`, `amal-dns-ebanking-both-unhealthy`; topic `amal-dns-alerts` has no subscribers by decision, so they notify nobody |
 | Query logging | `/aws/route53/ebanking.amalbankso.com`, retention 365 days |
 
@@ -21,7 +21,9 @@ no wildcard, no DNSSEC at the zone or the parent). Failover behaviour equals Dig
 secondary when the primary is unhealthy, automatic return when it recovers (the recording shows "turn off auto-failover after
 first failure" unchecked).
 
-## 2. Finding that changed the design: the secondary endpoint cannot be health-checked by Route 53
+## 2. Finding that changed the design: the original secondary could not be health-checked by Route 53 (resolved 2026-10-03)
+
+**Update 2026-10-03:** the owner replaced the secondary with the FortiGate `62.215.250.99` (applied to production, 2 in-place changes). Route 53's checkers reach it from **16 of 16** locations, so the original blocker no longer applies. The secondary record is still **not gated** by its health check (`secondary_failover_requires_health_check = false`); it can now be set to `true` to gate failover on a healthy secondary. The text below is the history of the original `91.140.155.171` endpoint. **DigiCert's failover location 2 must also be set to `62.215.250.99` by the owner** while resolvers are split between providers.
 
 Measured after deployment from Route 53's 16 health-check locations:
 - primary `37.34.133.35:443`: **16 of 16 connect**.
@@ -92,6 +94,8 @@ observation period ends and you approve.
 
 - 2026-10-02 05:06Z: re-check. 3343 queries since go-live; last hour 437 from 367 resolvers (434 NOERROR, 3 NXDOMAIN, all `www.ebanking`, which never existed at DigiCert). Primary 16/16 healthy, secondary still blocked by its firewall (alarm in ALARM as documented), Route 53 answers 37.34.133.35, no Terraform drift.
 
+- 2026-10-03: secondary endpoint changed from `91.140.155.171` (dead from Route 53's view) to the FortiGate `62.215.250.99` at the owner's request and approval. Plan reviewed (exactly two in-place updates), applied, then Route 53 health checkers: primary 16/16 connected, **secondary 16/16 connected**. Route 53 still answers `37.34.133.35` (primary healthy). The secondary alarm cleared to OK at 17:23Z once the metric recovered (healthy from 17:22Z); all ebanking alarms are OK. DigiCert not changed by this migration; owner to update its failover location 2.
+
 ## Completion status (against the migration brief)
 
 | Requirement | Status |
@@ -99,7 +103,7 @@ observation period ends and you approve.
 | Zone and failover records match the previous provider | Done (single apex A; PRIMARY/SECONDARY, TTL 1800) |
 | Delegation of `ebanking` in the `amalbankso.com` parent (GoDaddy) | Done, propagating |
 | Primary endpoint health check | Working from 16/16 locations |
-| Secondary endpoint health check | **Blocked by the secondary's firewall**; secondary record not gated by it (see section 2). Owner: bank network team |
+| Secondary endpoint health check | **Working** since 2026-10-03 (FortiGate `62.215.250.99`, 16/16). Secondary record not yet gated by it; optional switch to `true` (section 2) |
 | Failover exercised against the live endpoints | **Not done, by design.** Isolated test pair exists but is off |
 | Failback and both-down behaviour demonstrated | **Not demonstrated** (documented Route 53 behaviour only) |
 | Banking TLS and application-level checks (login/read) | **Pending, owner: you** (needs an approved test account; no transactions) |
