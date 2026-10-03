@@ -49,11 +49,11 @@ harmless and only completes when the old zones are retired after the observation
 - ebanking carriers: primary = Zain (`37.34.133.35`), secondary = FastTelco (`62.215.250.99`). The names are in the health-check `Name`/`Carrier`
   tags and alarm descriptions (variables `ebanking_primary_name`/`ebanking_secondary_name`), never in record `set_identifier`s: changing those
   would replace the live banking records.
-- ebanking secondary: changed on 2026-10-03 from `91.140.155.171` to the FortiGate `62.215.250.99` (applied; Route 53 checkers
-  reach it 16/16). The secondary record is still **not gated** by its health check
-  (`secondary_failover_requires_health_check = false`); setting it to `true` is now possible and matches the original design.
-  **The owner must also change DigiCert's failover location 2 to `62.215.250.99`.** Failover/failback have **not** been exercised
-  on live endpoints (by design).
+- ebanking secondary: changed on 2026-10-03 from `91.140.155.171` to the FortiGate `62.215.250.99` (FastTelco). The secondary record is
+  now **gated** on its own Route 53 health check (`secondary_failover_requires_health_check = true`, applied 2026-10-03): Route 53 serves
+  the secondary only while it is healthy, and the primary when both are unhealthy. Both endpoints are healthy from 16/16 locations.
+  **The owner must also change DigiCert's failover location 2 to `62.215.250.99`.** Failover/failback have **not** been exercised on
+  live endpoints (by design).
 - ebanking TTL is 1800 for parity; consider 300 then 60 after observation. Application-level banking checks need an
   owner-provided test account. 7-day observation, then the owner decides about retiring No-IP / DigiCert.
 

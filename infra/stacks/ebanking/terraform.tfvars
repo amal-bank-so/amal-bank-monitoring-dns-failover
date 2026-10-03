@@ -18,10 +18,8 @@ health_check_port              = 443
 health_check_interval          = 30
 health_check_failure_threshold = 3
 
-# The secondary endpoint accepts TCP 443 connections but its firewall blocks Route 53's health
-# checkers (measured 2026-10-01: all 16 locations time out; the primary connects from all 16).
-# Gating the secondary on that check would make failover impossible, so the secondary record is
-# served whenever the primary is unhealthy, as at the previous provider. The secondary check
-# remains as monitoring. Set to true once the secondary's firewall allows the Route 53
-# health-checker ranges (service ROUTE53_HEALTHCHECKS in https://ip-ranges.amazonaws.com/ip-ranges.json).
-secondary_failover_requires_health_check = false
+# Failover to the secondary (FastTelco 62.215.250.99) is gated on its own Route 53 health check, as in the
+# original design: Route 53 serves the secondary only while it is healthy. This was false from 2026-10-01 to
+# 2026-10-03 because the previous secondary (91.140.155.171) blocked Route 53's health checkers; the FortiGate
+# 62.215.250.99 is reachable from all 16 checker locations. Set to false to fail over without the check.
+secondary_failover_requires_health_check = true
