@@ -73,24 +73,6 @@ variable "logo_key" {
   default     = "logo.png"
 }
 
-variable "ebanking_primary_label" {
-  description = "How the primary e-banking endpoint is named in notification emails."
-  type        = string
-  default     = "Primary (Zain)"
-}
-
-variable "ebanking_secondary_label" {
-  description = "How the secondary e-banking endpoint is named in notification emails."
-  type        = string
-  default     = "Secondary (FastTelco)"
-}
-
-variable "notification_subject_prefix" {
-  description = "Prefix of every notification email subject."
-  type        = string
-  default     = "[Amal DNS] "
-}
-
 variable "notification_log_retention_days" {
   description = "Retention of the notify Lambda's logs."
   type        = number

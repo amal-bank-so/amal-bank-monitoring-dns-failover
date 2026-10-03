@@ -43,11 +43,11 @@ Propagation note: the share of resolvers on the AWS zone has plateaued (about 6/
 cached the old delegation keep refreshing it from the old provider's servers, which still serve identical data, so this is
 harmless and only completes when the old zones are retired after the observation period. Do not treat the plateau as a failure.
 
-### Notifications (deployed 2026-10-03, `shared` stack)
+### Notifications (deployed 2026-10-03, `shared` stack; subjects are exactly `<Severity> - <Title>`: no prefix, no `[TEST]` marker, no carrier names in brackets)
 Every alarm publishes to SNS topic `amal-dns-alerts`; Lambda `amal-dns-notify` (subscribed, `infra/stacks/shared/lambda/notify.py`) emails
-through SendGrid and sends **only** these four: **HIGH - Failover from Primary (Zain) to Secondary (FastTelco)** (alarm
-`amal-dns-ebanking-failover` -> ALARM: primary unhealthy and secondary healthy), **HIGH - Primary (Zain) is Back**
-(`amal-dns-ebanking-primary-unhealthy` -> OK), **HIGH - Secondary (FastTelco) is Down** (`amal-dns-ebanking-secondary-unhealthy` -> ALARM), **CRITICAL - E-Banking is Down** (`amal-dns-ebanking-both-unhealthy` -> ALARM). All other
+through SendGrid and sends **only** these four: **High - Failover from Primary to Secondary** (alarm
+`amal-dns-ebanking-failover` -> ALARM: primary unhealthy and secondary healthy), **High - Failover from Secondary to Primary**
+(`amal-dns-ebanking-primary-unhealthy` -> OK), **High - Secondary is Down** (`amal-dns-ebanking-secondary-unhealthy` -> ALARM), **Critical - E-Banking is Down** (`amal-dns-ebanking-both-unhealthy` -> ALARM). All other
 alarms (amalbank.so, ...) stay in the CloudWatch console and send nothing. The SendGrid key and sender are read at run
 time from Secrets Manager secret `SendGrid_API` in **eu-west-1** (fields `SENDGRID_API_KEY`, `SENDGRID_FROM_EMAIL`; the field name has a
 stray leading space, the Lambda strips it) and recipients from secret `SENDGRID_TO_EMAILS` (also eu-west-1, JSON field `SENDGRID_TO_EMAILS`,
@@ -57,10 +57,10 @@ email (upload or replace it, no deployment); falls back to a bundled `lambda/log
 logo (360x360 PNG, 14 KB) was loaded into the bucket on 2026-10-03 by a short-lived Lambda that fetched the owner's URL from AWS, because the sandbox's
 proxy blocks that host (the temporary Lambda and role were deleted). The header colour `#042c75` is the logo's own background navy. After editing `notify.py`
 run `python infra/stacks/shared/lambda/build.py`, commit the zip, then apply. Self-test (sends no mail, reports `recipients` and `logo_found`):
-invoke the Lambda with `{"selftest": true}`. `{"send_test": true}` sends one clearly marked `[TEST]` email per notification (4) through the real path without touching alarms; use it only when the owner asks.
+invoke the Lambda with `{"selftest": true}`. `{"send_test": true}` sends one test email per notification (4) through the real path (real subject, a grey banner in the body marks it as a test) without touching alarms; use it only when the owner asks.
 
 ### Open items
-- Notifications: logo is in S3 and recipients are configured (Lambda self-test: SendGrid ok, recipients 1, `logo_found: true`), and on 2026-10-03 the owner asked for test emails: 4 `[TEST]` emails were accepted by SendGrid (HTTP 202). Inbox arrival is for the owner to confirm; no *real* alarm has fired yet, so the alarm-to-email path is proven only by the test path plus local checks.
+- Notifications: logo is in S3 and recipients are configured (Lambda self-test: SendGrid ok, recipients 1, `logo_found: true`), and on 2026-10-03 the owner asked for test emails: 4 test emails were accepted by SendGrid (HTTP 202). Inbox arrival is for the owner to confirm; no *real* alarm has fired yet, so the alarm-to-email path is proven only by the test path plus local checks.
 - Outbound test mail from an `@amalbank.so` mailbox (inbound passed 2026-10-01).
 - Redirect path/query behaviour vs the legacy No-IP redirect is **assumed** (preserved); No-IP redirected to the `http://`
   address, AWS redirects to `https://` on purpose.

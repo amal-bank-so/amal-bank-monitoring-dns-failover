@@ -48,8 +48,8 @@ resource "aws_cloudwatch_composite_alarm" "ebanking_both_down" {
 }
 
 # Failover state: the primary is failing and the secondary is healthy, i.e. Route 53 is answering with the secondary. Its ALARM
-# state sends the "HIGH - Failover from Primary to Secondary" email (the shared stack's notify Lambda decides what to send).
-# If the secondary is unhealthy too this alarm stays OK and the both-unhealthy alarm (CRITICAL) takes over. "Primary is Back" is
+# state sends the "High - Failover from Primary to Secondary" email (the shared stack's notify Lambda decides what to send).
+# If the secondary is unhealthy too this alarm stays OK and the both-unhealthy alarm (CRITICAL) takes over. "Failover from Secondary to Primary" is
 # the primary-unhealthy alarm returning to OK.
 resource "aws_cloudwatch_composite_alarm" "ebanking_failover" {
   count = local.alarms_enabled ? 1 : 0

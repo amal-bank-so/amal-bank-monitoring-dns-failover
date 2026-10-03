@@ -1,8 +1,9 @@
-# Alarm notifications by email through SendGrid: exactly three e-banking notifications (the Lambda ignores every other
+# Alarm notifications by email through SendGrid: exactly four e-banking notifications (the Lambda ignores every other
 # alarm message; those alarms remain visible in the CloudWatch console):
-#   HIGH      Failover from Primary to Secondary   (ebanking stack alarm *-ebanking-failover -> ALARM)
-#   HIGH      Primary is Back                      (*-ebanking-primary-unhealthy -> OK)
-#   CRITICAL  E-Banking is Down                    (*-ebanking-both-unhealthy -> ALARM)
+#   High      Failover from Primary to Secondary   (ebanking stack alarm *-ebanking-failover -> ALARM)
+#   High      Failover from Secondary to Primary   (*-ebanking-primary-unhealthy -> OK)
+#   High      Secondary is Down                    (*-ebanking-secondary-unhealthy -> ALARM)
+#   Critical  E-Banking is Down                    (*-ebanking-both-unhealthy -> ALARM)
 #
 # Every alarm in every stack publishes to the shared SNS topic. A Lambda subscribed to that topic reads the SendGrid API key
 # and sender from AWS Secrets Manager at run time (nothing secret is in this repository, the environment or the state) and
@@ -74,9 +75,6 @@ resource "aws_lambda_function" "notify" {
       RECIPIENTS            = join(",", var.notification_recipients)
       ASSET_BUCKET          = aws_s3_bucket.assets.bucket
       LOGO_KEY              = var.logo_key
-      SUBJECT_PREFIX        = var.notification_subject_prefix
-      PRIMARY_LABEL         = var.ebanking_primary_label
-      SECONDARY_LABEL       = var.ebanking_secondary_label
       CONSOLE_REGION        = var.aws_region
     }
   }

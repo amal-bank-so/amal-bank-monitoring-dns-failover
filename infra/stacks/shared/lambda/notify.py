@@ -3,10 +3,12 @@
 Subscribed to the SNS topic that every CloudWatch alarm publishes to. Only these four alarm events send an email; every
 other alarm message is ignored (the alarms stay visible in the CloudWatch console):
 
-    HIGH      Failover from Primary to Secondary   alarm <prefix>-ebanking-failover            -> ALARM
-    HIGH      Primary is Back                      alarm <prefix>-ebanking-primary-unhealthy   -> OK
-    HIGH      Secondary is Down                    alarm <prefix>-ebanking-secondary-unhealthy -> ALARM
-    CRITICAL  E-Banking is Down                    alarm <prefix>-ebanking-both-unhealthy      -> ALARM
+    High      Failover from Primary to Secondary   alarm <prefix>-ebanking-failover            -> ALARM
+    High      Failover from Secondary to Primary   alarm <prefix>-ebanking-primary-unhealthy   -> OK
+    High      Secondary is Down                    alarm <prefix>-ebanking-secondary-unhealthy -> ALARM
+    Critical  E-Banking is Down                    alarm <prefix>-ebanking-both-unhealthy      -> ALARM
+
+The email subject is exactly "<Severity> - <Title>" (for example "High - Failover from Secondary to Primary"): no prefix, no marker and no carrier names.
 
 The SendGrid API key and the sender address are read from AWS Secrets Manager at run time (never from the environment or the
 repository):
@@ -20,8 +22,8 @@ are not exposed to each other. A failed send raises, so SNS retries the delivery
 ASSET_BUCKET/LOGO_KEY (upload or replace it any time, no deployment needed), a logo.png bundled next to this file, or a plain
 text header if neither exists.
 
-A direct invocation with {"send_test": true} sends one clearly marked TEST email per notification through the real rendering and
-SendGrid path, without touching any alarm or endpoint.
+A direct invocation with {"send_test": true} sends one test email per notification through the real rendering and
+SendGrid path, without touching any alarm or endpoint. The subject is the real one; a grey banner inside the body marks it as a test.
 
 A direct invocation with {"selftest": true} checks the secret, the key and the outbound path (GET /v3/scopes) without sending
 any email.
@@ -37,7 +39,7 @@ SENDGRID = "https://api.sendgrid.com/v3"
 LOGO_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logo.png")  # optional; bundled by build.py when present
 LOGO_CID = "amalbank-logo"
 NAVY = "#042c75"  # the logo's own background navy, so the logo blends into the header
-SEVERITY_COLOR = {"CRITICAL": "#b71c1c", "HIGH": "#e65100"}
+SEVERITY_COLOR = {"Critical": "#b71c1c", "High": "#e65100"}
 _secret_cache = None
 _recipients_cache = None
 _logo_cache = None
@@ -45,24 +47,23 @@ _logo_cache = None
 
 def classify(alarm_name, state):
     """-> (severity, title, explanation) for one of the three notifications, else None."""
-    primary = os.environ.get("PRIMARY_LABEL", "Primary")
-    secondary = os.environ.get("SECONDARY_LABEL", "Secondary")
     if alarm_name.endswith("-ebanking-failover") and state == "ALARM":
-        return ("HIGH", "Failover from %s to %s" % (primary, secondary),
-                "The primary endpoint is failing its health check and the secondary is healthy. Route 53 is now answering "
-                "with the secondary, so e-banking traffic is being served through it.")
+        return ("High", "Failover from Primary to Secondary",
+                "The primary endpoint is failing its health check and the secondary is healthy. Route 53 is now "
+                "answering with the secondary, so e-banking traffic is being served through it.")
     if alarm_name.endswith("-ebanking-primary-unhealthy") and state == "OK":
-        return ("HIGH", "%s is Back" % primary,
+        return ("High", "Failover from Secondary to Primary",
                 "The primary endpoint is passing its health check again. Route 53 answers with the primary again.")
     if alarm_name.endswith("-ebanking-secondary-unhealthy") and state == "ALARM":
-        return ("HIGH", "%s is Down" % secondary,
-                "The secondary endpoint is failing its health check, so there is currently no healthy failover target. If the "
-                "primary is healthy, e-banking is not affected. If the primary also fails you will receive the CRITICAL "
+        return ("High", "Secondary is Down",
+                "The secondary endpoint is failing its health check, so there is currently no healthy failover target. If "
+                "the primary is healthy, e-banking is not affected. If the primary also fails you will receive the Critical "
                 "E-Banking is Down notification.")
     if alarm_name.endswith("-ebanking-both-unhealthy") and state == "ALARM":
-        return ("CRITICAL", "E-Banking is Down",
-                "Both the primary and the secondary endpoints are failing their health checks. Route 53 keeps answering with "
-                "the primary because neither is healthy, so customers may be unable to reach e-banking. Investigate now.")
+        return ("Critical", "E-Banking is Down",
+                "Both the primary and the secondary endpoints are failing their health checks. Route 53 keeps "
+                "answering with the primary because neither is healthy, so customers may be unable to reach e-banking. "
+                "Investigate now.")
     return None
 
 
@@ -183,7 +184,7 @@ def render(alarm, severity, title, explanation, has_logo=False, test=False):
         '<div style="background:#f3f5fa;color:#667;padding:10px 16px;font-size:12px">Automated DNS monitoring notification '
         '(ebanking.amalbankso.com on AWS Route 53). Do not reply.</div></div>'
     ) % (NAVY, head, banner, color, "%s - %s" % (severity, title), table)
-    return ("[TEST] " if test else "") + "%s - %s" % (severity, title), text, html
+    return "%s - %s" % (severity, title), text, html
 
 
 TEST_CASES = [  # (alarm name suffix, state, description) for the TEST emails: the same four events the real alarms produce
@@ -208,7 +209,7 @@ def _send_test(key, sender, to, logo):
         subject, text, html = render(alarm, *kind, has_logo=bool(logo), test=True)
         payload = {
             "personalizations": [{"to": [{"email": a}]} for a in to], "from": {"email": sender},
-            "subject": os.environ.get("SUBJECT_PREFIX", "") + subject,
+            "subject": subject,
             "content": [{"type": "text/plain", "value": text}, {"type": "text/html", "value": html}],
         }
         if logo:
@@ -216,7 +217,7 @@ def _send_test(key, sender, to, logo):
         status, body = _request("POST", "/mail/send", key, payload)
         if status not in (200, 201, 202):
             raise RuntimeError("SendGrid rejected the test message: HTTP %s %s" % (status, body))
-        sent.append({"subject": os.environ.get("SUBJECT_PREFIX", "") + subject, "sendgrid_status": status})
+        sent.append({"subject": subject, "sendgrid_status": status})
     return {"sent": len(sent), "recipients": len(to), "messages": sent}
 
 
@@ -252,7 +253,7 @@ def handler(event, context):
         payload = {
             "personalizations": [{"to": [{"email": a}]} for a in to],
             "from": {"email": sender},
-            "subject": os.environ.get("SUBJECT_PREFIX", "") + subject,
+            "subject": subject,
             "content": [{"type": "text/plain", "value": text}, {"type": "text/html", "value": html}],
         }
         if logo:
