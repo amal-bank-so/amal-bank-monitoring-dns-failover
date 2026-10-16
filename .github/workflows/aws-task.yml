@@ -1,0 +1,68 @@
+name: aws-task
+# Runs one reviewed script from infra/tasks/ with READ-ONLY access to the DNS and e-banking monitoring resources, using
+# credentials that exist only for this run (GitHub OIDC, 30 minutes). The role is amal-bank-dns-failover-readonly in the
+# management account (code: amal-bank-so/amal-bank-aws-private-vpc, infra/organization/github-oidc-dns-failover.tf). It trusts
+# only the main branch of this repository. No keys or secrets are stored anywhere; nothing runs on pull requests or forks.
+on:
+  workflow_dispatch:
+    inputs:
+      script:
+        description: "Script file name under infra/tasks/ (for example ebanking-check.sh)"
+        required: true
+        default: ebanking-check.sh
+        type: string
+      args:
+        description: "Arguments for the script (optional)"
+        required: false
+        default: ""
+        type: string
+
+concurrency:
+  group: aws-task
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  AWS_REGION: us-east-1
+  SESSION_NAME: gh-${{ github.run_id }}-${{ github.actor }}
+
+jobs:
+  task:
+    # The role's trust policy also refuses every ref except main; this stops the run before it asks.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Check the script name
+        env:
+          SCRIPT: ${{ inputs.script }}
+        run: |
+          case "$SCRIPT" in
+            "" | */* | *..* | .*) echo "script must be a plain file name under infra/tasks/"; exit 1 ;;
+          esac
+          test -f "infra/tasks/$SCRIPT" || { echo "infra/tasks/$SCRIPT does not exist on this branch"; exit 1; }
+          bash -n "infra/tasks/$SCRIPT"
+
+      - name: AWS credentials (read-only role, 30 minutes)
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          role-to-assume: arn:aws:iam::029288159395:role/amal-bank-dns-failover-readonly
+          role-session-name: ${{ env.SESSION_NAME }}
+          role-duration-seconds: 1800
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Who am I
+        run: aws sts get-caller-identity
+
+      - name: Run the task
+        env:
+          SCRIPT: ${{ inputs.script }}
+          ARGS: ${{ inputs.args }}
+        run: |
+          # shellcheck disable=SC2086
+          bash "infra/tasks/$SCRIPT" $ARGS

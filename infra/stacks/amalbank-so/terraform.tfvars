@@ -24,7 +24,7 @@ enable_redirect_distribution = true
 # Delegation to Route 53 is live (2026-10-01). Attach the names and certificate (this waits for ACM to
 # issue the certificate), then point apex/www at CloudFront with web_use_cloudfront (rollback: false).
 enable_redirect_aliases = true
-web_use_cloudfront        = true
+web_use_cloudfront      = true
 
 # Background NXDOMAIN noise (browser/resolver random-label probes, mail receivers asking for _dmarc,
 # which never existed here or at the previous provider) reached 24 per 5 minutes while resolvers
