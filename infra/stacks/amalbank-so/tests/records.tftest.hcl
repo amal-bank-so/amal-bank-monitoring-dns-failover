@@ -4,9 +4,16 @@
 
 mock_provider "aws" {}
 
+# The production terraform.tfvars is loaded by `terraform test` too, so pin every switch to its default here: the runs
+# below describe the state before the redirect is attached, and the last run turns the switches on explicitly.
 variables {
-  enable_alarms  = false
-  legacy_web_ips = ["192.0.2.1"]
+  enable_alarms                = false
+  legacy_web_ips               = ["192.0.2.1"]
+  enable_certificate           = false
+  enable_redirect              = false
+  enable_redirect_distribution = false
+  enable_redirect_aliases      = false
+  web_use_cloudfront           = false
 }
 
 run "txt_values_are_unquoted_for_the_provider" {
